@@ -1,122 +1,124 @@
-/**
- * BluetoothService.js
- * direct Web Bluetooth API Integration for Thermal Printers (58mm)
- * Supports Multi-UUID, Data Chunking (20 bytes / 20ms delay), and ESC/POS encoding.
- */
+import { BleManager } from 'react-native-ble-plx';
+import { Platform, PermissionsAndroid } from 'react-native';
+import { Buffer } from 'buffer';
 
 class BluetoothService {
     constructor() {
+        this.manager = new BleManager();
         this.device = null;
-        this.server = null;
-        this.service = null;
-        this.characteristic = null;
-        this.connected = false;
-
-        // Common Service UUIDs for Thermal Printers
-        this.serviceUUIDs = [
-            '000018f0-0000-1000-8000-00805f9b34fb', // Standard Serial/POS
-            '0000ae30-0000-1000-8000-00805f9b34fb', // Panda / Goojprt
-            '0000e001-0000-1000-8000-00805f9b34fb', // Epson
-            '0000ff00-0000-1000-8000-00805f9b34fb', // RPP
-            '49535343-fe7d-4ae5-8fa9-9fafd205e455'  // Some other models
-        ];
-
-        // Characteristic UUIDs to look for (Write without response or Write)
-        this.characteristicUUIDs = [
-            '00002af1-0000-1000-8000-00805f9b34fb',
-            '0000ae01-0000-1000-8000-00805f9b34fb',
-            '0000be02-0000-1000-8000-00805f9b34fb',
-            '49535343-8841-43f4-a8d4-ecbe34729bb3'
-        ];
+        this.serviceUUID = null;
+        this.characteristicUUID = null;
     }
 
-    isSupported() {
-        return typeof navigator !== 'undefined' && !!navigator.bluetooth;
-    }
-
-    async connect() {
-        if (!this.isSupported()) {
-            throw new Error('Browser Anda tidak mendukung Web Bluetooth API.');
+    async requestPermissions() {
+        if (Platform.OS === 'android') {
+            if (Platform.Version >= 31) {
+                const result = await PermissionsAndroid.requestMultiple([
+                    PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+                    PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+                    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+                ]);
+                return (
+                    result['android.permission.BLUETOOTH_CONNECT'] === PermissionsAndroid.RESULTS.GRANTED &&
+                    result['android.permission.BLUETOOTH_SCAN'] === PermissionsAndroid.RESULTS.GRANTED &&
+                    result['android.permission.ACCESS_FINE_LOCATION'] === PermissionsAndroid.RESULTS.GRANTED
+                );
+            } else {
+                const granted = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+                );
+                return granted === PermissionsAndroid.RESULTS.GRANTED;
+            }
         }
+        return true;
+    }
 
+    scanDevices(onDeviceFound) {
+        this.manager.startDeviceScan(null, null, (error, device) => {
+            if (error) {
+                console.error('Scan error:', error);
+                return;
+            }
+            if (device.name) {
+                onDeviceFound(device);
+            }
+        });
+    }
+
+    stopScan() {
+        this.manager.stopDeviceScan();
+    }
+
+    async connectToDevice(deviceId) {
         try {
-            console.log('Requesting Bluetooth Device...');
-            this.device = await navigator.bluetooth.requestDevice({
-                filters: [
-                    { services: this.serviceUUIDs },
-                    { namePrefix: 'Printer' },
-                    { namePrefix: 'MP' },
-                    { namePrefix: 'RPP' }
-                ],
-                optionalServices: this.serviceUUIDs
-            });
-
-            console.log('Connecting to GATT Server...');
-            this.server = await this.device.gatt.connect();
-
-            // Find primary service and characteristic
-            for (const uuid of this.serviceUUIDs) {
-                try {
-                    this.service = await this.server.getPrimaryService(uuid);
-                    if (this.service) break;
-                } catch (e) {
-                    continue;
-                }
-            }
-
-            if (!this.service) {
-                throw new Error('Service Printer tidak ditemukan.');
-            }
-
-            // Find characteristic for writing
-            const characteristics = await this.service.getCharacteristics();
-            this.characteristic = characteristics.find(c => 
-                c.properties.write || c.properties.writeWithoutResponse
-            );
-
-            if (!this.characteristic) {
-                throw new Error('Write characteristic tidak ditemukan.');
-            }
-
-            this.connected = true;
-            console.log('Printer Connected Successfully');
-            
-            this.device.addEventListener('gattserverdisconnected', () => {
-                this.connected = false;
-                console.log('Printer Disconnected');
-            });
-
-            return this.device;
+            this.stopScan();
+            console.log(`Connecting to ${deviceId}...`);
+            const device = await this.manager.connectToDevice(deviceId);
+            console.log('Connected, discovering services...');
+            await device.discoverAllServicesAndCharacteristics();
+            this.device = device;
+            console.log('Services discovered');
+            return device;
         } catch (error) {
-            console.error('Connection Failed:', error);
+            console.error('Connection error:', error);
             throw error;
         }
     }
 
     async disconnect() {
-        if (this.device && this.device.gatt.connected) {
-            await this.device.gatt.disconnect();
+        if (this.device) {
+            try {
+                await this.device.cancelConnection();
+                this.device = null;
+            } catch (error) {
+                console.error('Disconnect error:', error);
+            }
         }
-        this.connected = false;
-        this.device = null;
-        this.server = null;
-        this.service = null;
-        this.characteristic = null;
     }
 
-    async sendDataInChunks(data) {
-        if (!this.characteristic || !this.connected) {
-            throw new Error('Printer tidak terhubung.');
+    async sendData(data) {
+        if (!this.device) {
+            throw new Error('Device not connected');
         }
 
-        const CHUNK_SIZE = 20;
-        const DELAY_MS = 20;
+        // Find writable characteristic (simple approach: loop services)
+        // Optimization: Cache service/char UUIDs after connection
+        if (!this.serviceUUID || !this.characteristicUUID) {
+            const services = await this.device.services();
+            for (const service of services) {
+                const characteristics = await service.characteristics();
+                const writableChar = characteristics.find(c => c.isWritableWithoutResponse || c.isWritable);
+                if (writableChar) {
+                    this.serviceUUID = service.uuid;
+                    this.characteristicUUID = writableChar.uuid;
+                    break;
+                }
+            }
+        }
 
+        if (!this.serviceUUID || !this.characteristicUUID) {
+            throw new Error('No writable characteristic found');
+        }
+
+        // Write data in chunks (native BLE often has MTU limits, e.g., 20 or 512 bytes)
+        // Most thermal printers handle small chunks fine.
+        const CHUNK_SIZE = 100;
         for (let i = 0; i < data.length; i += CHUNK_SIZE) {
             const chunk = data.slice(i, i + CHUNK_SIZE);
-            await this.characteristic.writeValue(chunk);
-            await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+            // Convert Uint8Array to Base64
+            const nonNullChunk = chunk.filter(byte => byte != null); // Safety
+            const base64Data = Buffer.from(nonNullChunk).toString('base64');
+
+            await this.device.writeCharacteristicWithoutResponseForService(
+                this.serviceUUID,
+                this.characteristicUUID,
+                base64Data
+            );
         }
+    }
+
+    isSupported() {
+        return true; // Native lib is supported in app
     }
 }
 

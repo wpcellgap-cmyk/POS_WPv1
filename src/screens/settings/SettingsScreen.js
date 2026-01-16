@@ -38,7 +38,7 @@ const SettingSection = ({ title, children }) => (
 const SettingsScreen = ({ navigation }) => {
     const { ownerId, userProfile, logout } = useAuth();
     const { primaryColor, themeId, updateTheme } = useTheme();
-    const { isConnected, isConnecting, connect, disconnect, device, isSupported } = useBluetooth();
+    const { isConnected, isConnecting, connect, disconnect, device, isSupported, startScan, scannedDevices, isScanning } = useBluetooth();
     const [storeName, setStoreName] = useState('');
     const [storeTagline, setStoreTagline] = useState('');
     const [storeAddress, setStoreAddress] = useState('');
@@ -71,12 +71,12 @@ const SettingsScreen = ({ navigation }) => {
         }
     };
 
-    const handleConnect = async () => {
-        if (!isSupported) {
-            Alert.alert('Error', 'Browser Anda tidak mendukung Web Bluetooth API.');
-            return;
-        }
-        const success = await connect();
+    const handleConnect = async (deviceId) => {
+        // if (!isSupported) { // Native check is always true in this new service context 
+        //     Alert.alert('Error', 'Bluetooth tidak didukung.');
+        //     return;
+        // }
+        const success = await connect(deviceId);
         if (success) {
             Alert.alert('Berhasil', 'Printer terhubung.');
         } else {
@@ -199,7 +199,8 @@ const SettingsScreen = ({ navigation }) => {
                                 <Ionicons name="print" size={24} color={primaryColor} />
                                 <View style={styles.printerDetails}>
                                     <Text style={styles.printerName}>{device?.name || 'Printer Terhubung'}</Text>
-                                    <Text style={styles.printerAddress}>Status: Terhubung (Direct Web Bluetooth)</Text>
+                                    <Text style={styles.printerAddress}>{device?.id}</Text>
+                                    <Text style={[styles.printerAddress, { color: theme.colors.success }]}>Status: Terhubung</Text>
                                 </View>
                             </View>
                             <TouchableOpacity
@@ -213,11 +214,36 @@ const SettingsScreen = ({ navigation }) => {
                         <View>
                             <Text style={styles.noPrinter}>Belum ada printer terhubung</Text>
                             <Button
-                                title={isConnecting ? "Menghubungkan..." : "Hubungkan Printer Bluetooth"}
-                                onPress={handleConnect}
-                                loading={isConnecting}
+                                title={isScanning ? "Memindai..." : "Pindai Printer Bluetooth"}
+                                onPress={startScan}
+                                loading={isScanning}
                                 icon="bluetooth-outline"
                             />
+
+                            {scannedDevices.length > 0 && (
+                                <View style={styles.deviceList}>
+                                    <Text style={styles.deviceListTitle}>Perangkat Ditemukan:</Text>
+                                    {scannedDevices.map((dev) => (
+                                        <TouchableOpacity
+                                            key={dev.id}
+                                            style={styles.deviceItem}
+                                            onPress={() => handleConnect(dev.id)}
+                                            disabled={isConnecting}
+                                        >
+                                            <Ionicons name="print-outline" size={20} color={theme.colors.textSecondary} />
+                                            <View style={{ flex: 1, marginLeft: 10 }}>
+                                                <Text style={styles.deviceName}>{dev.name || 'Unnamed Device'}</Text>
+                                                <Text style={{ fontSize: 10, color: theme.colors.textSecondary }}>{dev.id}</Text>
+                                            </View>
+                                            {isConnecting && device?.id === dev.id ? (
+                                                <ActivityIndicator size="small" color={primaryColor} />
+                                            ) : (
+                                                <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                                            )}
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
                         </View>
                     )}
                 </SettingSection>

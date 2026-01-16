@@ -19,11 +19,37 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.gavin2.poskonterapp"
+      "package": "com.gavin2.poskonterapp",
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": [
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "Allow ${PRODUCT_NAME} to access Bluetooth to connect to printers",
+          "bluetoothPeripheralPermission": "Allow ${PRODUCT_NAME} to access Bluetooth to connect to printers"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow ${PRODUCT_NAME} to use your location to find nearby Bluetooth printers."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "48b0ee45-aa5e-4503-83f8-7188bac1193f"

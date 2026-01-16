@@ -9,34 +9,60 @@ export const BluetoothProvider = ({ children }) => {
     const [isConnected, setIsConnected] = useState(false);
     const [device, setDevice] = useState(null);
     const [isConnecting, setIsConnecting] = useState(false);
+    const [scannedDevices, setScannedDevices] = useState([]);
+    const [isScanning, setIsScanning] = useState(false);
 
     useEffect(() => {
-        // Handle unexpected disconnections
-        const handleDisconnect = () => {
-            setIsConnected(false);
-            setDevice(null);
+        const checkConnection = async () => {
+            // Optional: Check if already connected (rehydration)
         };
-
-        if (device) {
-            device.addEventListener('gattserverdisconnected', handleDisconnect);
-        }
+        checkConnection();
 
         return () => {
-            if (device) {
-                device.removeEventListener('gattserverdisconnected', handleDisconnect);
-            }
+            BluetoothService.disconnect();
         };
-    }, [device]);
+    }, []);
 
-    const connect = async () => {
+    const startScan = async () => {
+        const hasPermission = await BluetoothService.requestPermissions();
+        if (!hasPermission) {
+            console.warn('Bluetooth permissions not granted');
+            return;
+        }
+
+        setScannedDevices([]);
+        setIsScanning(true);
+
+        BluetoothService.scanDevices((newDevice) => {
+            setScannedDevices((prevDevices) => {
+                const exists = prevDevices.find(d => d.id === newDevice.id);
+                if (exists) return prevDevices;
+                return [...prevDevices, newDevice];
+            });
+        });
+
+        // Auto stop scan after 10 seconds
+        setTimeout(() => {
+            if (isScanning) stopScan();
+        }, 10000);
+    };
+
+    const stopScan = () => {
+        BluetoothService.stopScan();
+        setIsScanning(false);
+    };
+
+    const connect = async (deviceId) => {
         setIsConnecting(true);
+        stopScan(); // Stop scanning before connecting
         try {
-            const connectedDevice = await BluetoothService.connect();
+            const connectedDevice = await BluetoothService.connectToDevice(deviceId);
             setDevice(connectedDevice);
             setIsConnected(true);
             return true;
         } catch (error) {
             console.error('Context Connection Error:', error);
+            setIsConnected(false);
             return false;
         } finally {
             setIsConnecting(false);
@@ -60,6 +86,10 @@ export const BluetoothProvider = ({ children }) => {
             isConnected,
             device,
             isConnecting,
+            isScanning,
+            scannedDevices,
+            startScan,
+            stopScan,
             connect,
             disconnect,
             isSupported: BluetoothService.isSupported()
