@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
-import BluetoothPrinterService from '../../services/BluetoothPrinterService';
+import BluetoothService from '../../services/BluetoothService';
 import { useTheme } from '../../context/ThemeContext';
 import { collection, query, onSnapshot, orderBy, getDoc, doc as fsDoc } from 'firebase/firestore';
 import * as Print from 'expo-print';
@@ -198,10 +198,10 @@ const HistoryScreen = () => {
             };
 
             // Check for Bluetooth Printer
-            const connectedPrinter = await BluetoothPrinterService.getStoredDevice();
+            const connectedPrinter = await BluetoothService.getStoredDevice();
             if (connectedPrinter) {
                 try {
-                    await BluetoothPrinterService.printSalesReceipt(transactionData, currentStoreSettings);
+                    await BluetoothService.printSalesReceipt(transactionData, currentStoreSettings);
                     Alert.alert('Berhasil', 'Struk berhasil dicetak via Bluetooth');
                     return;
                 } catch (error) {

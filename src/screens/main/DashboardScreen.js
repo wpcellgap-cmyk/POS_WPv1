@@ -271,7 +271,7 @@ const DashboardScreen = ({ navigation }) => {
                 .cut()
                 .encode();
 
-            await BluetoothService.sendDataInChunks(result);
+            await BluetoothService.sendData(result);
             Alert.alert('Berhasil', 'Struk berhasil dicetak.');
         } catch (error) {
             console.error('Print error:', error);

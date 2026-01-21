@@ -206,7 +206,7 @@ const CheckoutScreen = ({ navigation, route }) => {
                 .cut()
                 .encode();
 
-            await BluetoothService.sendDataInChunks(result);
+            await BluetoothService.sendData(result);
             Alert.alert('Berhasil', 'Struk berhasil dicetak.');
         } catch (error) {
             console.error('Print Error:', error);

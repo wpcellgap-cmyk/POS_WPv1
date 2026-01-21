@@ -15,7 +15,7 @@ import { shareAsync } from 'expo-sharing';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
-import BluetoothPrinterService from '../../services/BluetoothPrinterService';
+import BluetoothService from '../../services/BluetoothService';
 import { theme } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
 import ReceiptTemplate from '../../components/ReceiptTemplate';
@@ -142,11 +142,11 @@ const ReceiptPreviewScreen = ({ navigation, route }) => {
         setPrinting(true);
         try {
             // Check for Bluetooth Printer first
-            const connectedPrinter = await BluetoothPrinterService.getStoredDevice();
+            const connectedPrinter = await BluetoothService.getStoredDevice();
             if (connectedPrinter) {
                 setLoading(true);
                 try {
-                    await BluetoothPrinterService.printServiceReceipt(serviceData, storeSettings);
+                    await BluetoothService.printServiceReceipt(serviceData, storeSettings);
                     Alert.alert('Berhasil', 'Struk berhasil dicetak via Bluetooth');
                     return;
                 } catch (error) {

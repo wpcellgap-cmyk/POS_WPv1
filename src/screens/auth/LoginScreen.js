@@ -62,8 +62,11 @@ const LoginScreen = ({ navigation }) => {
                                 icon="lock-closed-outline"
                             />
 
-                            <TouchableOpacity style={styles.forgotPassword}>
-                                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                            <TouchableOpacity
+                                style={styles.forgotPassword}
+                                onPress={() => navigation.navigate('ForgotPassword')}
+                            >
+                                <Text style={styles.forgotPasswordText}>Lupa Password?</Text>
                             </TouchableOpacity>
 
                             <Button title="Login" onPress={handleLogin} loading={loading} style={styles.button} />

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "pos-konter-app",
-    "slug": "pos-konter-app",
-    "version": "1.0.0",
+    "name": "POS WPCELL",
+    "slug": "pos-wpcell",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -24,7 +24,7 @@
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
@@ -33,26 +33,25 @@
     },
     "plugins": [
       [
-        "react-native-ble-plx",
+        "@config-plugins/react-native-ble-plx",
         {
           "isBackgroundEnabled": false,
           "modes": [
             "central"
           ],
-          "bluetoothAlwaysPermission": "Allow ${PRODUCT_NAME} to access Bluetooth to connect to printers",
-          "bluetoothPeripheralPermission": "Allow ${PRODUCT_NAME} to access Bluetooth to connect to printers"
+          "bluetoothAlwaysPermission": "Allow $(PRODUCT_NAME) to access Bluetooth to connect to printers"
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow ${PRODUCT_NAME} to use your location to find nearby Bluetooth printers."
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "48b0ee45-aa5e-4503-83f8-7188bac1193f"
+        "projectId": "79254802-88bc-4441-9cd3-0b34187bbf6b"
       }
     }
   }

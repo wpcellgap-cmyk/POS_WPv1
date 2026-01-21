@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import BluetoothService from '../services/BluetoothService';
 
 const BluetoothContext = createContext();
@@ -11,10 +11,15 @@ export const BluetoothProvider = ({ children }) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [scannedDevices, setScannedDevices] = useState([]);
     const [isScanning, setIsScanning] = useState(false);
+    const isScanningRef = useRef(false);
 
     useEffect(() => {
         const checkConnection = async () => {
-            // Optional: Check if already connected (rehydration)
+            // Check for stored device on mount
+            const storedDevice = await BluetoothService.getStoredDevice();
+            if (storedDevice) {
+                setDevice(storedDevice);
+            }
         };
         checkConnection();
 
@@ -22,6 +27,11 @@ export const BluetoothProvider = ({ children }) => {
             BluetoothService.disconnect();
         };
     }, []);
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        isScanningRef.current = isScanning;
+    }, [isScanning]);
 
     const startScan = async () => {
         const hasPermission = await BluetoothService.requestPermissions();
@@ -41,9 +51,9 @@ export const BluetoothProvider = ({ children }) => {
             });
         });
 
-        // Auto stop scan after 10 seconds
+        // Auto stop scan after 10 seconds - use ref to avoid stale closure
         setTimeout(() => {
-            if (isScanning) stopScan();
+            if (isScanningRef.current) stopScan();
         }, 10000);
     };
 

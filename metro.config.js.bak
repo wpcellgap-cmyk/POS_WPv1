@@ -2,6 +2,7 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
+// Tambahan untuk menangani encoding printer thermal
 config.resolver.extraNodeModules = {
     ...config.resolver.extraNodeModules,
     'iconv-lite-encodings': require.resolve('iconv-lite/encodings/index.js'),
