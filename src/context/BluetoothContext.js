@@ -15,20 +15,25 @@ export const BluetoothProvider = ({ children }) => {
 
     useEffect(() => {
         const checkConnection = async () => {
-            // Check for stored device on mount
             const storedDevice = await BluetoothService.getStoredDevice();
             if (storedDevice) {
                 setDevice(storedDevice);
+                try {
+                    await BluetoothService.connectToDevice(storedDevice.address || storedDevice.id);
+                    setIsConnected(true);
+                } catch (error) {
+                    console.log('Auto-reconnect failed:', error.message);
+                }
             }
         };
         checkConnection();
 
         return () => {
             BluetoothService.disconnect();
+            BluetoothService.stopScan();
         };
     }, []);
 
-    // Keep ref in sync with state
     useEffect(() => {
         isScanningRef.current = isScanning;
     }, [isScanning]);
@@ -40,10 +45,17 @@ export const BluetoothProvider = ({ children }) => {
             return;
         }
 
+        const isEnabled = await BluetoothService.isBluetoothAvailable();
+        if (!isEnabled) {
+            console.warn('Bluetooth is not enabled');
+            return;
+        }
+
         setScannedDevices([]);
         setIsScanning(true);
 
-        BluetoothService.scanDevices((newDevice) => {
+        // Scan paired + discover new devices
+        await BluetoothService.scanDevices((newDevice) => {
             setScannedDevices((prevDevices) => {
                 const exists = prevDevices.find(d => d.id === newDevice.id);
                 if (exists) return prevDevices;
@@ -51,20 +63,41 @@ export const BluetoothProvider = ({ children }) => {
             });
         });
 
-        // Auto stop scan after 10 seconds - use ref to avoid stale closure
+        // Auto stop after 15 seconds
         setTimeout(() => {
             if (isScanningRef.current) stopScan();
-        }, 10000);
+        }, 15000);
     };
 
-    const stopScan = () => {
-        BluetoothService.stopScan();
+    const stopScan = async () => {
+        await BluetoothService.stopScan();
         setIsScanning(false);
+    };
+
+    /**
+     * Pair dengan device baru
+     */
+    const pairDevice = async (deviceAddress) => {
+        try {
+            const paired = await BluetoothService.pairDevice(deviceAddress);
+            if (paired) {
+                // Update device list to mark as bonded
+                setScannedDevices((prev) =>
+                    prev.map(d =>
+                        d.address === deviceAddress ? { ...d, bonded: true } : d
+                    )
+                );
+            }
+            return paired;
+        } catch (error) {
+            console.error('Pairing failed:', error);
+            return false;
+        }
     };
 
     const connect = async (deviceId) => {
         setIsConnecting(true);
-        stopScan(); // Stop scanning before connecting
+        await stopScan();
         try {
             const connectedDevice = await BluetoothService.connectToDevice(deviceId);
             setDevice(connectedDevice);
@@ -100,6 +133,7 @@ export const BluetoothProvider = ({ children }) => {
             scannedDevices,
             startScan,
             stopScan,
+            pairDevice,
             connect,
             disconnect,
             isSupported: BluetoothService.isSupported()

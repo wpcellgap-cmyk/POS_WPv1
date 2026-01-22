@@ -38,13 +38,14 @@ const SettingSection = ({ title, children }) => (
 const SettingsScreen = ({ navigation }) => {
     const { ownerId, userProfile, logout } = useAuth();
     const { primaryColor, themeId, updateTheme } = useTheme();
-    const { isConnected, isConnecting, connect, disconnect, device, isSupported, startScan, scannedDevices, isScanning } = useBluetooth();
+    const { isConnected, isConnecting, connect, disconnect, device, isSupported, startScan, stopScan, scannedDevices, isScanning, pairDevice } = useBluetooth();
     const [storeName, setStoreName] = useState('');
     const [storeTagline, setStoreTagline] = useState('');
     const [storeAddress, setStoreAddress] = useState('');
     const [storePhone, setStorePhone] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
+    const [isPairing, setIsPairing] = useState(false);
 
     useEffect(() => {
         loadSettings();
@@ -72,15 +73,37 @@ const SettingsScreen = ({ navigation }) => {
     };
 
     const handleConnect = async (deviceId) => {
-        // if (!isSupported) { // Native check is always true in this new service context 
-        //     Alert.alert('Error', 'Bluetooth tidak didukung.');
-        //     return;
-        // }
         const success = await connect(deviceId);
         if (success) {
             Alert.alert('Berhasil', 'Printer terhubung.');
         } else {
             Alert.alert('Error', 'Gagal menghubungkan printer.');
+        }
+    };
+
+    const handlePair = async (deviceAddress) => {
+        setIsPairing(true);
+        try {
+            const paired = await pairDevice(deviceAddress);
+            if (paired) {
+                Alert.alert('Berhasil', 'Printer berhasil di-pair. Tap lagi untuk connect.');
+            } else {
+                Alert.alert('Gagal', 'Tidak bisa pair dengan printer.');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Gagal pair: ' + error.message);
+        } finally {
+            setIsPairing(false);
+        }
+    };
+
+    const handleDevicePress = async (dev) => {
+        if (dev.bonded) {
+            // Already paired, connect directly
+            handleConnect(dev.address || dev.id);
+        } else {
+            // Not paired, pair first
+            handlePair(dev.address || dev.id);
         }
     };
 
@@ -227,18 +250,28 @@ const SettingsScreen = ({ navigation }) => {
                                         <TouchableOpacity
                                             key={dev.id}
                                             style={styles.deviceItem}
-                                            onPress={() => handleConnect(dev.id)}
-                                            disabled={isConnecting}
+                                            onPress={() => handleDevicePress(dev)}
+                                            disabled={isConnecting || isPairing}
                                         >
-                                            <Ionicons name="print-outline" size={20} color={theme.colors.textSecondary} />
+                                            <Ionicons
+                                                name={dev.bonded ? "print" : "print-outline"}
+                                                size={20}
+                                                color={dev.bonded ? primaryColor : theme.colors.textSecondary}
+                                            />
                                             <View style={{ flex: 1, marginLeft: 10 }}>
                                                 <Text style={styles.deviceName}>{dev.name || 'Unnamed Device'}</Text>
-                                                <Text style={{ fontSize: 10, color: theme.colors.textSecondary }}>{dev.id}</Text>
+                                                <Text style={{ fontSize: 10, color: theme.colors.textSecondary }}>
+                                                    {dev.id} {dev.bonded ? '(Paired)' : '(Tap to Pair)'}
+                                                </Text>
                                             </View>
-                                            {isConnecting && device?.id === dev.id ? (
+                                            {(isConnecting || isPairing) && device?.id === dev.id ? (
                                                 <ActivityIndicator size="small" color={primaryColor} />
                                             ) : (
-                                                <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+                                                <View style={[styles.actionBadge, { backgroundColor: dev.bonded ? primaryColor : theme.colors.warning }]}>
+                                                    <Text style={styles.actionBadgeText}>
+                                                        {dev.bonded ? 'Connect' : 'Pair'}
+                                                    </Text>
+                                                </View>
                                             )}
                                         </TouchableOpacity>
                                     ))}
@@ -448,6 +481,16 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: theme.colors.text,
         marginLeft: theme.spacing.sm,
+    },
+    actionBadge: {
+        paddingHorizontal: theme.spacing.sm,
+        paddingVertical: theme.spacing.xs,
+        borderRadius: theme.borderRadius.sm,
+    },
+    actionBadgeText: {
+        color: theme.colors.white,
+        fontSize: 11,
+        fontWeight: '600',
     },
     themeGrid: {
         flexDirection: 'row',

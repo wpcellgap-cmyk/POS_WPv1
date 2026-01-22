@@ -24,6 +24,7 @@
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ]
@@ -33,16 +34,6 @@
     },
     "plugins": [
       [
-        "@config-plugins/react-native-ble-plx",
-        {
-          "isBackgroundEnabled": false,
-          "modes": [
-            "central"
-          ],
-          "bluetoothAlwaysPermission": "Allow $(PRODUCT_NAME) to access Bluetooth to connect to printers"
-        }
-      ],
-      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
@@ -51,7 +42,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "79254802-88bc-4441-9cd3-0b34187bbf6b"
+        "projectId": "b3882398-ea04-4eed-8c4f-3133c2f0d2c2"
       }
     }
   }

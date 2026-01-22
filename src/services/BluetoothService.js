@@ -1,17 +1,17 @@
-import { BleManager } from 'react-native-ble-plx';
-import { Platform, PermissionsAndroid } from 'react-native';
+import { Platform, PermissionsAndroid, NativeModules, NativeEventEmitter } from 'react-native';
 import { Buffer } from 'buffer';
 import EscPosEncoder from 'esc-pos-encoder';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RNBluetoothClassic from 'react-native-bluetooth-classic';
 
 const STORED_DEVICE_KEY = '@bluetooth_printer_device';
 
 class BluetoothService {
     constructor() {
-        this.manager = new BleManager();
         this.device = null;
-        this.serviceUUID = null;
-        this.characteristicUUID = null;
+        this.isBluetoothEnabled = false;
+        this.isDiscovering = false;
+        this.discoverySubscription = null;
     }
 
     async requestPermissions() {
@@ -37,36 +37,182 @@ class BluetoothService {
         return true;
     }
 
-    scanDevices(onDeviceFound) {
-        this.manager.startDeviceScan(null, null, (error, device) => {
-            if (error) {
-                console.error('Scan error:', error);
+    /**
+     * Check if Bluetooth is enabled
+     */
+    async isBluetoothAvailable() {
+        try {
+            return await RNBluetoothClassic.isBluetoothEnabled();
+        } catch (error) {
+            console.error('Bluetooth check error:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Get list of paired/bonded devices
+     * Bluetooth Classic requires devices to be paired first via Android Settings
+     */
+    async getBondedDevices() {
+        try {
+            const bonded = await RNBluetoothClassic.getBondedDevices();
+            return bonded || [];
+        } catch (error) {
+            console.error('Get bonded devices error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Scan for paired devices only
+     * @param {Function} onDeviceFound - Callback when device found
+     */
+    async scanPairedDevices(onDeviceFound) {
+        try {
+            const isEnabled = await this.isBluetoothAvailable();
+            if (!isEnabled) {
+                console.warn('Bluetooth is not enabled');
                 return;
             }
-            if (device.name) {
-                onDeviceFound(device);
-            }
-        });
+
+            const bondedDevices = await this.getBondedDevices();
+            bondedDevices.forEach(device => {
+                if (device.name) {
+                    onDeviceFound({
+                        id: device.address || device.id,
+                        name: device.name,
+                        address: device.address || device.id,
+                        bonded: true,
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('Scan paired error:', error);
+        }
     }
 
-    stopScan() {
-        this.manager.stopDeviceScan();
-    }
-
-    async connectToDevice(deviceId) {
+    /**
+     * Start discovery untuk mencari perangkat baru (belum paired)
+     * @param {Function} onDeviceFound - Callback when device found
+     */
+    async startDiscovery(onDeviceFound) {
         try {
-            this.stopScan();
-            console.log(`Connecting to ${deviceId}...`);
-            const device = await this.manager.connectToDevice(deviceId);
-            console.log('Connected, discovering services...');
-            await device.discoverAllServicesAndCharacteristics();
-            this.device = device;
-            console.log('Services discovered');
+            const isEnabled = await this.isBluetoothAvailable();
+            if (!isEnabled) {
+                console.warn('Bluetooth is not enabled');
+                return false;
+            }
 
-            // Store device for later retrieval
-            await this.storeDevice(device);
+            this.isDiscovering = true;
 
-            return device;
+            // Listen for discovered devices
+            this.discoverySubscription = RNBluetoothClassic.onDeviceDiscovered((device) => {
+                if (device && device.name) {
+                    onDeviceFound({
+                        id: device.address || device.id,
+                        name: device.name,
+                        address: device.address || device.id,
+                        bonded: device.bonded || false,
+                    });
+                }
+            });
+
+            // Start the discovery process
+            await RNBluetoothClassic.startDiscovery();
+            return true;
+        } catch (error) {
+            console.error('Discovery error:', error);
+            this.isDiscovering = false;
+            return false;
+        }
+    }
+
+    /**
+     * Stop discovery
+     */
+    async cancelDiscovery() {
+        try {
+            if (this.discoverySubscription) {
+                this.discoverySubscription.remove();
+                this.discoverySubscription = null;
+            }
+            await RNBluetoothClassic.cancelDiscovery();
+            this.isDiscovering = false;
+        } catch (error) {
+            console.error('Cancel discovery error:', error);
+        }
+    }
+
+    /**
+     * Scan untuk semua perangkat (paired + discovery new devices)
+     * @param {Function} onDeviceFound - Callback when device found
+     */
+    async scanDevices(onDeviceFound) {
+        // First, get paired devices
+        await this.scanPairedDevices(onDeviceFound);
+
+        // Then start discovery for new devices
+        await this.startDiscovery(onDeviceFound);
+    }
+
+    /**
+     * Stop scan and discovery
+     */
+    async stopScan() {
+        await this.cancelDiscovery();
+    }
+
+    /**
+     * Pair dengan perangkat baru
+     * @param {string} deviceAddress - MAC address perangkat
+     * @returns {boolean} - true jika berhasil paired
+     */
+    async pairDevice(deviceAddress) {
+        try {
+            await this.cancelDiscovery();
+            const paired = await RNBluetoothClassic.pairDevice(deviceAddress);
+            return paired;
+        } catch (error) {
+            console.error('Pair error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Unpair perangkat
+     * @param {string} deviceAddress - MAC address perangkat
+     */
+    async unpairDevice(deviceAddress) {
+        try {
+            await RNBluetoothClassic.unpairDevice(deviceAddress);
+            return true;
+        } catch (error) {
+            console.error('Unpair error:', error);
+            return false;
+        }
+    }
+
+    async connectToDevice(deviceAddress) {
+        try {
+            console.log(`Connecting to ${deviceAddress}...`);
+
+            // Connect to device
+            const device = await RNBluetoothClassic.connectToDevice(deviceAddress);
+
+            if (device) {
+                this.device = device;
+                console.log('Connected to:', device.name);
+
+                // Store device for later retrieval
+                await this.storeDevice({
+                    id: device.address || deviceAddress,
+                    name: device.name,
+                    address: device.address || deviceAddress,
+                });
+
+                return device;
+            }
+            throw new Error('Failed to connect to device');
         } catch (error) {
             console.error('Connection error:', error);
             throw error;
@@ -76,10 +222,8 @@ class BluetoothService {
     async disconnect() {
         if (this.device) {
             try {
-                await this.device.cancelConnection();
+                await RNBluetoothClassic.disconnectFromDevice(this.device.address || this.device.id);
                 this.device = null;
-                this.serviceUUID = null;
-                this.characteristicUUID = null;
                 await AsyncStorage.removeItem(STORED_DEVICE_KEY);
             } catch (error) {
                 console.error('Disconnect error:', error);
@@ -93,8 +237,9 @@ class BluetoothService {
     async storeDevice(device) {
         try {
             const deviceInfo = {
-                id: device.id,
+                id: device.address || device.id,
                 name: device.name,
+                address: device.address || device.id,
             };
             await AsyncStorage.setItem(STORED_DEVICE_KEY, JSON.stringify(deviceInfo));
         } catch (error) {
@@ -115,8 +260,9 @@ class BluetoothService {
             // Fallback: return current device if connected
             if (this.device) {
                 return {
-                    id: this.device.id,
+                    id: this.device.address || this.device.id,
                     name: this.device.name,
+                    address: this.device.address || this.device.id,
                 };
             }
             return null;
@@ -142,44 +288,46 @@ class BluetoothService {
         return this.device;
     }
 
+    /**
+     * Reconnect to stored device
+     */
+    async reconnectToStoredDevice() {
+        try {
+            const storedDevice = await this.getStoredDevice();
+            if (storedDevice && storedDevice.address) {
+                return await this.connectToDevice(storedDevice.address);
+            }
+            return null;
+        } catch (error) {
+            console.error('Reconnect error:', error);
+            return null;
+        }
+    }
+
     async sendData(data) {
         if (!this.device) {
-            throw new Error('Device not connected');
-        }
-
-        // Find writable characteristic (simple approach: loop services)
-        // Optimization: Cache service/char UUIDs after connection
-        if (!this.serviceUUID || !this.characteristicUUID) {
-            const services = await this.device.services();
-            for (const service of services) {
-                const characteristics = await service.characteristics();
-                const writableChar = characteristics.find(c => c.isWritableWithoutResponse || c.isWritable);
-                if (writableChar) {
-                    this.serviceUUID = service.uuid;
-                    this.characteristicUUID = writableChar.uuid;
-                    break;
-                }
+            // Try to reconnect
+            const reconnected = await this.reconnectToStoredDevice();
+            if (!reconnected) {
+                throw new Error('Printer tidak terhubung. Silakan hubungkan printer terlebih dahulu.');
             }
         }
 
-        if (!this.serviceUUID || !this.characteristicUUID) {
-            throw new Error('No writable characteristic found');
-        }
+        try {
+            // Convert Uint8Array to Base64 string for sending
+            const base64Data = Buffer.from(data).toString('base64');
 
-        // Write data in chunks (native BLE often has MTU limits, e.g., 20 or 512 bytes)
-        // Most thermal printers handle small chunks fine.
-        const CHUNK_SIZE = 100;
-        for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-            const chunk = data.slice(i, i + CHUNK_SIZE);
-            // Convert Uint8Array to Base64
-            const nonNullChunk = chunk.filter(byte => byte != null); // Safety
-            const base64Data = Buffer.from(nonNullChunk).toString('base64');
-
-            await this.device.writeCharacteristicWithoutResponseForService(
-                this.serviceUUID,
-                this.characteristicUUID,
-                base64Data
+            // Write data to the device
+            await RNBluetoothClassic.writeToDevice(
+                this.device.address || this.device.id,
+                base64Data,
+                'base64'
             );
+
+            console.log('Data sent successfully');
+        } catch (error) {
+            console.error('Send data error:', error);
+            throw error;
         }
     }
 
@@ -197,10 +345,6 @@ class BluetoothService {
      * @param {Object} storeSettings - Pengaturan toko
      */
     async printServiceReceipt(serviceData, storeSettings) {
-        if (!this.device) {
-            throw new Error('Printer tidak terhubung');
-        }
-
         const {
             serviceNumber = 'SVC-000001',
             customerName = '',
@@ -278,10 +422,6 @@ class BluetoothService {
      * @param {Object} storeSettings - Pengaturan toko
      */
     async printSalesReceipt(transactionData, storeSettings) {
-        if (!this.device) {
-            throw new Error('Printer tidak terhubung');
-        }
-
         const {
             storeName = 'WP CELL',
             storeTagline = 'Service HP Software & Hardware',
@@ -351,7 +491,7 @@ class BluetoothService {
     }
 
     isSupported() {
-        return true; // Native lib is supported in app
+        return Platform.OS === 'android'; // Bluetooth Classic mainly supported on Android
     }
 }
 
