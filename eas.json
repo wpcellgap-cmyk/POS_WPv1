@@ -10,7 +10,6 @@
     },
     "preview": {
       "distribution": "internal",
-      "newArchEnabled": false,
       "android": {
         "buildType": "apk"
       },
@@ -20,7 +19,6 @@
       }
     },
     "production": {
-      "newArchEnabled": false,
       "autoIncrement": true
     }
   },
