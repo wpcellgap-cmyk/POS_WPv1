@@ -20,6 +20,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.gavin2.poskonterapp",
+      "newArchEnabled": false,
       "permissions": [
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",

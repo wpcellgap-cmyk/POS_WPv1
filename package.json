@@ -16,7 +16,7 @@
     "@react-navigation/stack": "^7.6.13",
     "buffer": "^6.0.3",
     "esc-pos-encoder": "^2.1.0",
-    "expo": "~54.0.31",
+    "expo": "~54.0.32",
     "expo-dev-client": "~6.0.20",
     "expo-device": "~8.0.10",
     "expo-location": "~19.0.8",
