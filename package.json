@@ -34,5 +34,14 @@
     "react-native-web": "^0.21.0",
     "react-native-worklets": "0.5.1"
   },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-bluetooth-classic"
+        ]
+      }
+    }
+  },
   "private": true
 }
