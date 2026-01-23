@@ -9,7 +9,7 @@ import { theme } from '../../constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const LoginScreen = ({ navigation }) => {
-    const { primaryColor } = useTheme();
+    const { primaryColor, themeColors } = useTheme();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -31,7 +31,7 @@ const LoginScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
                 style={styles.keyboardView}
@@ -40,9 +40,9 @@ const LoginScreen = ({ navigation }) => {
                     <View style={styles.content}>
                         <Logo />
 
-                        <View style={styles.form}>
-                            <Text style={styles.headerTitle}>Welcome Back</Text>
-                            <Text style={styles.headerSubtitle}>Sign in to manage your store</Text>
+                        <View style={[styles.form, { backgroundColor: themeColors.card }]}>
+                            <Text style={[styles.headerTitle, { color: themeColors.text }]}>Welcome Back</Text>
+                            <Text style={[styles.headerSubtitle, { color: themeColors.textSecondary }]}>Sign in to manage your store</Text>
 
                             <Input
                                 label="Email Address"
@@ -72,7 +72,7 @@ const LoginScreen = ({ navigation }) => {
                             <Button title="Login" onPress={handleLogin} loading={loading} style={styles.button} />
 
                             <View style={styles.footer}>
-                                <Text style={styles.footerText}>Don't have an account? </Text>
+                                <Text style={[styles.footerText, { color: themeColors.textSecondary }]}>Don't have an account? </Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('Register')}>
                                     <Text style={[styles.link, { color: primaryColor }]}>Daftar Sekarang</Text>
                                 </TouchableOpacity>

@@ -4,14 +4,17 @@ import { useTheme } from '../context/ThemeContext';
 import { theme } from '../constants/theme';
 
 const Button = ({ title, onPress, loading, variant = 'primary', style }) => {
-    const { primaryColor } = useTheme();
+    const { primaryColor, themeColors } = useTheme();
     const isPrimary = variant === 'primary';
     const isLoading = !!loading;
+
     return (
         <TouchableOpacity
             style={[
                 styles.button,
-                isPrimary ? { backgroundColor: primaryColor } : styles.secondaryButton,
+                isPrimary
+                    ? { backgroundColor: primaryColor }
+                    : { backgroundColor: themeColors.card, borderWidth: 1, borderColor: themeColors.border },
                 style,
                 isLoading && styles.disabled
             ]}
@@ -19,7 +22,7 @@ const Button = ({ title, onPress, loading, variant = 'primary', style }) => {
             disabled={isLoading}
         >
             {isLoading ? (
-                <ActivityIndicator color={isPrimary ? theme.colors.white : primaryColor} />
+                <ActivityIndicator color={isPrimary ? '#FFFFFF' : primaryColor} />
             ) : (
                 <Text style={[styles.text, isPrimary ? styles.primaryText : { color: primaryColor }]}>
                     {title}
@@ -38,11 +41,6 @@ const styles = StyleSheet.create({
         width: '100%',
         ...theme.shadow.sm,
     },
-    secondaryButton: {
-        backgroundColor: theme.colors.white,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-    },
     disabled: {
         opacity: 0.7,
     },
@@ -50,11 +48,9 @@ const styles = StyleSheet.create({
         ...theme.typography.button,
     },
     primaryText: {
-        color: theme.colors.white,
-    },
-    secondaryText: {
-        color: theme.colors.textPrimary,
+        color: '#FFFFFF',
     },
 });
 
 export default Button;
+

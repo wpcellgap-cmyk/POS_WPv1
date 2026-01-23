@@ -19,7 +19,7 @@ import { collection, query, onSnapshot, deleteDoc, doc, orderBy } from 'firebase
 
 const ProductListScreen = ({ navigation }) => {
     const { ownerId } = useAuth();
-    const { primaryColor } = useTheme();
+    const { primaryColor, themeColors } = useTheme();
     const [products, setProducts] = useState([]);
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -86,14 +86,14 @@ const ProductListScreen = ({ navigation }) => {
 
     const renderProduct = ({ item }) => (
         <TouchableOpacity
-            style={styles.productCard}
+            style={[styles.productCard, { backgroundColor: themeColors.card }]}
             onPress={() => navigation.navigate('ProductForm', { product: item })}
             onLongPress={() => handleDeleteProduct(item.id, item.name)}
         >
             <View style={styles.productInfo}>
-                <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+                <Text style={[styles.productName, { color: themeColors.text }]} numberOfLines={2}>{item.name}</Text>
                 <Text style={[styles.productPrice, { color: primaryColor }]}>{formatCurrency(item.sellPrice)}</Text>
-                <Text style={styles.productStock}>Stok: {item.stock}</Text>
+                <Text style={[styles.productStock, { color: themeColors.textSecondary }]}>Stok: {item.stock}</Text>
             </View>
             <View style={styles.stockBadge}>
                 <Text style={[
@@ -115,20 +115,20 @@ const ProductListScreen = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]} edges={['top', 'left', 'right']}>
             <View style={[styles.header, { borderBottomColor: primaryColor }]}>
                 <Text style={[styles.title, { color: primaryColor }]}>Manajemen Stok</Text>
-                <Text style={styles.subtitle}>{products.length} produk</Text>
+                <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>{products.length} produk</Text>
             </View>
 
-            <View style={styles.searchContainer}>
-                <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+            <View style={[styles.searchContainer, { backgroundColor: themeColors.card }]}>
+                <Ionicons name="search" size={20} color={themeColors.textSecondary} />
                 <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, { color: themeColors.text }]}
                     placeholder="Cari produk atau kategori..."
                     value={searchQuery}
                     onChangeText={setSearchQuery}
-                    placeholderTextColor={theme.colors.textSecondary}
+                    placeholderTextColor={themeColors.textSecondary}
                 />
                 {searchQuery.length > 0 && (
                     <TouchableOpacity onPress={() => setSearchQuery('')}>

@@ -69,6 +69,12 @@ const ReceiptPreviewScreen = ({ navigation, route }) => {
             return (amount || 0).toLocaleString('id-ID');
         };
 
+        // Convert newlines to <br> for HTML display
+        const formatKerusakan = (text) => {
+            if (!text) return '-';
+            return text.replace(/\n/g, '<br>');
+        };
+
         return `
             <!DOCTYPE html>
             <html>
@@ -76,20 +82,26 @@ const ReceiptPreviewScreen = ({ navigation, route }) => {
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
+                    /* Base styles - 58mm */
                     @page {
                         size: 58mm auto;
                         margin: 0;
                     }
+                    
+                    * {
+                        box-sizing: border-box;
+                    }
+                    
                     body {
                         width: 54mm;
                         margin: 0 auto;
                         padding: 2mm 0;
                         font-family: 'Courier New', Courier, monospace;
                         font-size: 10pt;
-                        line-height: 1.2;
+                        line-height: 1.3;
                         color: #000;
-                        box-sizing: border-box;
                     }
+                    
                     .center { text-align: center; }
                     .bold { font-weight: bold; }
                     .divider { border-top: 1px dashed #000; margin: 4px 0; }
@@ -97,6 +109,58 @@ const ReceiptPreviewScreen = ({ navigation, route }) => {
                     .row { display: flex; justify-content: space-between; }
                     .header-name { font-size: 14pt; font-weight: bold; margin-bottom: 2mm; }
                     .footer-line { text-align: center; font-size: 9pt; margin-top: 1mm; }
+                    
+                    /* Word wrap styles for long text */
+                    .wrap-text {
+                        word-wrap: break-word;
+                        overflow-wrap: break-word;
+                        white-space: pre-wrap;
+                        max-width: 100%;
+                    }
+                    
+                    .label-row {
+                        display: flex;
+                        flex-wrap: wrap;
+                    }
+                    
+                    .label {
+                        flex-shrink: 0;
+                        min-width: 70px;
+                    }
+                    
+                    .value {
+                        flex: 1;
+                        word-wrap: break-word;
+                        overflow-wrap: break-word;
+                        white-space: pre-wrap;
+                    }
+                    
+                    /* Print media query for 58mm */
+                    @media print {
+                        @page {
+                            size: 58mm auto;
+                            margin: 0;
+                        }
+                        body {
+                            width: 54mm;
+                            font-size: 10pt;
+                        }
+                    }
+                    
+                    /* Print media query for 80mm */
+                    @media print and (min-width: 75mm) {
+                        @page {
+                            size: 80mm auto;
+                            margin: 0;
+                        }
+                        body {
+                            width: 76mm;
+                            font-size: 11pt;
+                        }
+                        .header-name {
+                            font-size: 16pt;
+                        }
+                    }
                 </style>
             </head>
             <body>
@@ -118,7 +182,10 @@ const ReceiptPreviewScreen = ({ navigation, route }) => {
                 <div>Merk HP  : ${phoneBrand}</div>
                 <div>Type HP  : ${phoneType || '-'}</div>
                 <div>Imei     : ${imei || '-'}</div>
-                <div>Kerusakan: ${damageDescription}</div>
+                <div class="label-row">
+                    <span class="label">Kerusakan:</span>
+                    <span class="value wrap-text">${formatKerusakan(damageDescription)}</span>
+                </div>
                 <div class="divider"></div>
                 <div class="bold">Biaya    : Rp ${formatCurrency(cost)}</div>
                 <div>Garansi  : ${warranty}</div>

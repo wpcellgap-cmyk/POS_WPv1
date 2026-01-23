@@ -21,7 +21,7 @@ import * as Print from 'expo-print';
 
 const HistoryScreen = () => {
     const { ownerId } = useAuth();
-    const { primaryColor } = useTheme();
+    const { primaryColor, themeColors } = useTheme();
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -243,17 +243,17 @@ const HistoryScreen = () => {
     };
 
     const renderTransaction = ({ item }) => (
-        <TouchableOpacity style={styles.transactionCard} onPress={() => openDetail(item)}>
+        <TouchableOpacity style={[styles.transactionCard, { backgroundColor: themeColors.card }]} onPress={() => openDetail(item)}>
             <View style={styles.transactionHeader}>
                 <View style={[styles.transactionIcon, { backgroundColor: primaryColor + '15' }]}>
                     <Ionicons name="receipt-outline" size={24} color={primaryColor} />
                 </View>
                 <View style={styles.transactionInfo}>
-                    <Text style={styles.transactionDate}>{formatDate(item.createdAt)}</Text>
-                    <Text style={styles.transactionItems}>{item.itemCount || item.items?.length || 0} item</Text>
+                    <Text style={[styles.transactionDate, { color: themeColors.text }]}>{formatDate(item.createdAt)}</Text>
+                    <Text style={[styles.transactionItems, { color: themeColors.textSecondary }]}>{item.itemCount || item.items?.length || 0} item</Text>
                 </View>
                 <View style={styles.transactionAmount}>
-                    <Text style={styles.transactionTotal}>{formatCurrency(item.total)}</Text>
+                    <Text style={[styles.transactionTotal, { color: themeColors.text }]}>{formatCurrency(item.total)}</Text>
                     <View style={[styles.paymentBadge, { backgroundColor: primaryColor + '15' }]}>
                         <Text style={[styles.paymentBadgeText, { color: primaryColor }]}>{getPaymentMethodLabel(item.paymentMethod)}</Text>
                     </View>
@@ -271,10 +271,10 @@ const HistoryScreen = () => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]} edges={['top', 'left', 'right']}>
             <View style={[styles.header, { borderBottomColor: primaryColor }]}>
                 <Text style={[styles.title, { color: primaryColor }]}>Riwayat Transaksi</Text>
-                <Text style={styles.subtitle}>{transactions.length} transaksi</Text>
+                <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>{transactions.length} transaksi</Text>
             </View>
 
             {transactions.length === 0 ? (
@@ -300,11 +300,11 @@ const HistoryScreen = () => {
                 onRequestClose={() => setModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Detail Transaksi</Text>
+                    <View style={[styles.modalContent, { backgroundColor: themeColors.card }]}>
+                        <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
+                            <Text style={[styles.modalTitle, { color: themeColors.text }]}>Detail Transaksi</Text>
                             <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <Ionicons name="close" size={24} color={theme.colors.text} />
+                                <Ionicons name="close" size={24} color={themeColors.text} />
                             </TouchableOpacity>
                         </View>
 

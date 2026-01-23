@@ -19,7 +19,7 @@ import { collection, query, onSnapshot, deleteDoc, doc, orderBy } from 'firebase
 
 const ServiceListScreen = ({ navigation }) => {
     const { ownerId } = useAuth();
-    const { primaryColor } = useTheme();
+    const { primaryColor, themeColors } = useTheme();
     const [services, setServices] = useState([]);
     const [filteredServices, setFilteredServices] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -123,7 +123,7 @@ const ServiceListScreen = ({ navigation }) => {
 
     const renderService = ({ item }) => (
         <TouchableOpacity
-            style={styles.serviceCard}
+            style={[styles.serviceCard, { backgroundColor: themeColors.card }]}
             onPress={() => navigation.navigate('ServiceForm', { service: item })}
             onLongPress={() => handleDeleteService(item.id, item.customerName)}
         >
@@ -135,11 +135,11 @@ const ServiceListScreen = ({ navigation }) => {
                     </Text>
                 </View>
             </View>
-            <Text style={styles.customerName}>{item.customerName}</Text>
-            <Text style={styles.phoneInfo}>{item.phoneBrand} {item.phoneType}</Text>
-            <View style={styles.serviceFooter}>
-                <Text style={styles.serviceDate}>{formatDate(item.createdAt)}</Text>
-                <Text style={styles.serviceCost}>{formatCurrency(item.cost)}</Text>
+            <Text style={[styles.customerName, { color: themeColors.text }]}>{item.customerName}</Text>
+            <Text style={[styles.phoneInfo, { color: themeColors.textSecondary }]}>{item.phoneBrand} {item.phoneType}</Text>
+            <View style={[styles.serviceFooter, { borderTopColor: themeColors.border }]}>
+                <Text style={[styles.serviceDate, { color: themeColors.textSecondary }]}>{formatDate(item.createdAt)}</Text>
+                <Text style={[styles.serviceCost, { color: themeColors.text }]}>{formatCurrency(item.cost)}</Text>
             </View>
         </TouchableOpacity>
     );
@@ -153,24 +153,24 @@ const ServiceListScreen = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]} edges={['top', 'left', 'right']}>
             <View style={[styles.header, { borderBottomColor: primaryColor }]}>
                 <View>
                     <Text style={[styles.title, { color: primaryColor }]}>Daftar Layanan</Text>
-                    <Text style={styles.subtitle}>{services.length} total layanan</Text>
+                    <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>{services.length} total layanan</Text>
                 </View>
                 <View style={styles.headerActions}>
                 </View>
             </View>
 
-            <View style={styles.searchContainer}>
-                <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+            <View style={[styles.searchContainer, { backgroundColor: themeColors.card }]}>
+                <Ionicons name="search" size={20} color={themeColors.textSecondary} />
                 <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, { color: themeColors.text }]}
                     placeholder="Cari nama, nomor service, atau merk HP..."
                     value={searchQuery}
                     onChangeText={setSearchQuery}
-                    placeholderTextColor={theme.colors.textSecondary}
+                    placeholderTextColor={themeColors.textSecondary}
                 />
                 {searchQuery.length > 0 && (
                     <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -259,15 +259,15 @@ const styles = StyleSheet.create({
     serviceCard: {
         backgroundColor: theme.colors.white,
         borderRadius: theme.borderRadius.md,
-        padding: theme.spacing.md,
-        marginBottom: theme.spacing.sm,
+        padding: 12,
+        marginBottom: 6,
         ...theme.shadow.sm,
     },
     serviceHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: theme.spacing.xs,
+        marginBottom: 2,
     },
     serviceNumber: {
         fontSize: 12,

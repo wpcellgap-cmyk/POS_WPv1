@@ -61,9 +61,35 @@ const ReceiptTemplate = ({ serviceData, storeSettings }) => {
         return paddedLabel + ': ' + (value || '-');
     };
 
+    // Function to wrap long text for kerusakan field
+    const wrapKerusakan = (text, maxWidth = RECEIPT_WIDTH - 13) => {
+        if (!text) return ['-'];
+        const lines = [];
+        const paragraphs = text.split('\n');
+
+        paragraphs.forEach(paragraph => {
+            const words = paragraph.split(' ');
+            let currentLine = '';
+
+            words.forEach(word => {
+                if ((currentLine + ' ' + word).trim().length <= maxWidth) {
+                    currentLine = (currentLine + ' ' + word).trim();
+                } else {
+                    if (currentLine) lines.push(currentLine);
+                    currentLine = word;
+                }
+            });
+            if (currentLine) lines.push(currentLine);
+        });
+
+        return lines.length > 0 ? lines : ['-'];
+    };
+
     const dividerStar = '*'.repeat(RECEIPT_WIDTH);
     const dividerDash = '-'.repeat(RECEIPT_WIDTH);
     const dividerEqual = '='.repeat(RECEIPT_WIDTH);
+
+    const kerusakanLines = wrapKerusakan(damageDescription);
 
     return (
         <View style={styles.receiptContainer}>
@@ -91,7 +117,13 @@ const ReceiptTemplate = ({ serviceData, storeSettings }) => {
                 <Text style={styles.line}>{labelValue('Merk HP', phoneBrand)}</Text>
                 <Text style={styles.line}>{labelValue('Type HP', phoneType)}</Text>
                 <Text style={styles.line}>{labelValue('Imei', imei)}</Text>
-                <Text style={styles.line}>{labelValue('Kerusakan', damageDescription)}</Text>
+
+                {/* Kerusakan with wrapping support */}
+                <Text style={styles.line}>{'Kerusakan  : ' + kerusakanLines[0]}</Text>
+                {kerusakanLines.slice(1).map((line, index) => (
+                    <Text key={index} style={styles.lineWrapped}>{'             ' + line}</Text>
+                ))}
+
                 <Text style={styles.line}>{dividerDash}</Text>
 
                 {/* Cost Section */}
@@ -125,6 +157,12 @@ const styles = StyleSheet.create({
         maxWidth: 260, // Better represents ~54mm on mobile screens
     },
     line: {
+        fontFamily: 'monospace',
+        fontSize: 12,
+        lineHeight: 18,
+        color: '#333',
+    },
+    lineWrapped: {
         fontFamily: 'monospace',
         fontSize: 12,
         lineHeight: 18,

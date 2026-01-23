@@ -28,7 +28,7 @@ const PAYMENT_METHODS = [
 
 const CheckoutScreen = ({ navigation, route }) => {
     const { ownerId, userProfile } = useAuth();
-    const { primaryColor } = useTheme();
+    const { primaryColor, themeColors } = useTheme();
     const { cart, total } = route.params;
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [amountPaid, setAmountPaid] = useState('');
@@ -283,10 +283,10 @@ const CheckoutScreen = ({ navigation, route }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+                    <Ionicons name="arrow-back" size={24} color={themeColors.text} />
                 </TouchableOpacity>
                 <Text style={[styles.title, { color: primaryColor }]}>Checkout</Text>
                 <View style={styles.placeholder} />
@@ -294,29 +294,29 @@ const CheckoutScreen = ({ navigation, route }) => {
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Ringkasan Pesanan</Text>
-                    <View style={styles.orderSummary}>
+                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Ringkasan Pesanan</Text>
+                    <View style={[styles.orderSummary, { backgroundColor: themeColors.card }]}>
                         {cart.map((item) => (
                             <View key={item.id} style={styles.orderItem}>
                                 <View style={styles.orderItemLeft}>
-                                    <Text style={styles.orderItemName}>{item.name}</Text>
-                                    <Text style={styles.orderItemQty}>x{item.qty}</Text>
+                                    <Text style={[styles.orderItemName, { color: themeColors.text }]}>{item.name}</Text>
+                                    <Text style={[styles.orderItemQty, { color: themeColors.textSecondary }]}>x{item.qty}</Text>
                                 </View>
                                 <Text style={styles.orderItemPrice}>
                                     {formatCurrency(item.sellPrice * item.qty)}
                                 </Text>
                             </View>
                         ))}
-                        <View style={styles.divider} />
+                        <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
                         <View style={styles.totalRow}>
-                            <Text style={styles.totalLabel}>Total</Text>
+                            <Text style={[styles.totalLabel, { color: themeColors.text }]}>Total</Text>
                             <Text style={[styles.totalAmount, { color: primaryColor }]}>{formatCurrency(total)}</Text>
                         </View>
                     </View>
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Metode Pembayaran</Text>
+                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Metode Pembayaran</Text>
                     <View style={styles.paymentMethods}>
                         {PAYMENT_METHODS.map((method) => (
                             <TouchableOpacity
@@ -345,16 +345,16 @@ const CheckoutScreen = ({ navigation, route }) => {
 
                 {paymentMethod === 'cash' && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Jumlah Bayar</Text>
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.currencyPrefix}>Rp</Text>
+                        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Jumlah Bayar</Text>
+                        <View style={[styles.inputContainer, { backgroundColor: themeColors.card }]}>
+                            <Text style={[styles.currencyPrefix, { color: themeColors.textSecondary }]}>Rp</Text>
                             <TextInput
-                                style={styles.amountInput}
+                                style={[styles.amountInput, { color: themeColors.text }]}
                                 value={amountPaid}
                                 onChangeText={setAmountPaid}
                                 keyboardType="numeric"
                                 placeholder="0"
-                                placeholderTextColor={theme.colors.textSecondary}
+                                placeholderTextColor={themeColors.textSecondary}
                             />
                         </View>
                         <View style={styles.quickAmounts}>

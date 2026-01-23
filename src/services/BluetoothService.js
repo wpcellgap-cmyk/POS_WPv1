@@ -305,30 +305,78 @@ class BluetoothService {
     }
 
     async sendData(data) {
-        if (!this.device) {
-            // Try to reconnect
+        const deviceAddress = this.device?.address || this.device?.id;
+
+        // Step 1: Check if we have device info
+        if (!this.device || !deviceAddress) {
+            console.log('No device info, attempting to reconnect...');
             const reconnected = await this.reconnectToStoredDevice();
             if (!reconnected) {
                 throw new Error('Printer tidak terhubung. Silakan hubungkan printer terlebih dahulu.');
             }
         }
 
+        // Step 2: Verify actual connection status (not just state)
         try {
-            // Convert Uint8Array to Base64 string for sending
-            const base64Data = Buffer.from(data).toString('base64');
-
-            // Write data to the device
-            await RNBluetoothClassic.writeToDevice(
-                this.device.address || this.device.id,
-                base64Data,
-                'base64'
-            );
-
-            console.log('Data sent successfully');
-        } catch (error) {
-            console.error('Send data error:', error);
-            throw error;
+            const actuallyConnected = await RNBluetoothClassic.isDeviceConnected(deviceAddress);
+            if (!actuallyConnected) {
+                console.log('Device not actually connected, reconnecting...');
+                await this.connectToDevice(deviceAddress);
+            }
+        } catch (connError) {
+            console.log('Connection check failed, reconnecting...', connError.message);
+            await this.connectToDevice(deviceAddress);
         }
+
+        // Step 3: Send data with retry mechanism
+        const maxRetries = 3;
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`Send attempt ${attempt}/${maxRetries}...`);
+
+                // Convert Uint8Array to Base64 string for sending
+                const base64Data = Buffer.from(data).toString('base64');
+
+                // Send data in chunks for reliability (512 bytes per chunk)
+                const chunkSize = 512;
+                const totalChunks = Math.ceil(base64Data.length / chunkSize);
+
+                for (let i = 0; i < totalChunks; i++) {
+                    const chunk = base64Data.slice(i * chunkSize, (i + 1) * chunkSize);
+                    await RNBluetoothClassic.writeToDevice(
+                        deviceAddress,
+                        chunk,
+                        'base64'
+                    );
+                    // Small delay between chunks for printer buffer
+                    if (i < totalChunks - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                }
+
+                console.log('Data sent successfully');
+                return; // Success, exit
+            } catch (error) {
+                lastError = error;
+                console.error(`Send attempt ${attempt} failed:`, error.message);
+
+                if (attempt < maxRetries) {
+                    // Wait before retry
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // Try to reconnect before retrying
+                    try {
+                        await this.connectToDevice(deviceAddress);
+                    } catch (reconnectError) {
+                        console.error('Reconnect failed:', reconnectError.message);
+                    }
+                }
+            }
+        }
+
+        // All retries failed
+        throw new Error(`Gagal mengirim data setelah ${maxRetries} percobaan: ${lastError?.message || 'Unknown error'}`);
     }
 
     /**
@@ -367,6 +415,32 @@ class BluetoothService {
 
         const dateObj = date instanceof Date ? date : (date?.toDate ? date.toDate() : new Date(date));
 
+        // Helper function to wrap text for ESC/POS (32 char width)
+        const wrapText = (text, maxWidth = 32, indent = 0) => {
+            if (!text) return ['-'];
+            const lines = [];
+            const paragraphs = text.split('\n');
+            const indentStr = ' '.repeat(indent);
+            const effectiveWidth = maxWidth - indent;
+
+            paragraphs.forEach(paragraph => {
+                const words = paragraph.split(' ');
+                let currentLine = '';
+
+                words.forEach(word => {
+                    if ((currentLine + ' ' + word).trim().length <= effectiveWidth) {
+                        currentLine = (currentLine + ' ' + word).trim();
+                    } else {
+                        if (currentLine) lines.push(indentStr + currentLine);
+                        currentLine = word;
+                    }
+                });
+                if (currentLine) lines.push(indentStr + currentLine);
+            });
+
+            return lines.length > 0 ? lines : ['-'];
+        };
+
         const encoder = new EscPosEncoder();
         let result = encoder
             .initialize()
@@ -395,8 +469,16 @@ class BluetoothService {
             .line('-'.repeat(32))
             .line(`Merk HP  : ${phoneBrand}`)
             .line(`Type HP  : ${phoneType || '-'}`)
-            .line(`Imei     : ${imei || '-'}`)
-            .line(`Kerusakan: ${damageDescription}`)
+            .line(`Imei     : ${imei || '-'}`);
+
+        // Handle multiline kerusakan with wrapping
+        const kerusakanLines = wrapText(damageDescription, 32, 11); // 11 = length of "Kerusakan: "
+        result.line(`Kerusakan: ${kerusakanLines[0].trim()}`);
+        kerusakanLines.slice(1).forEach(line => {
+            result.line(line);
+        });
+
+        result
             .line('-'.repeat(32))
             .bold(true)
             .line(`Biaya    : Rp ${(cost || 0).toLocaleString('id-ID')}`)

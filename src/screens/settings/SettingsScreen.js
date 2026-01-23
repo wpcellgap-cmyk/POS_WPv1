@@ -28,16 +28,16 @@ const THEME_OPTIONS = [
     { id: 'red', name: 'Merah', color: '#EF4444' },
 ];
 
-const SettingSection = ({ title, children }) => (
+const SettingSection = ({ title, children, themeColors }) => (
     <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <View style={styles.sectionContent}>{children}</View>
+        <Text style={[styles.sectionTitle, themeColors && { color: themeColors.textSecondary }]}>{title}</Text>
+        <View style={[styles.sectionContent, themeColors && { backgroundColor: themeColors.card }]}>{children}</View>
     </View>
 );
 
 const SettingsScreen = ({ navigation }) => {
     const { ownerId, userProfile, logout } = useAuth();
-    const { primaryColor, themeId, updateTheme } = useTheme();
+    const { primaryColor, themeId, updateTheme, isDark, toggleDarkMode, themeColors } = useTheme();
     const { isConnected, isConnecting, connect, disconnect, device, isSupported, startScan, stopScan, scannedDevices, isScanning, pairDevice } = useBluetooth();
     const [storeName, setStoreName] = useState('');
     const [storeTagline, setStoreTagline] = useState('');
@@ -175,14 +175,14 @@ const SettingsScreen = ({ navigation }) => {
         date: new Date(),
     };
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]} edges={['top', 'left', 'right']}>
             <View style={styles.header}>
-                <Text style={styles.title}>Pengaturan</Text>
+                <Text style={[styles.title, { color: themeColors.text }]}>Pengaturan</Text>
             </View>
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Store Info Section */}
-                <SettingSection title="Informasi Toko">
+                <SettingSection title="Informasi Toko" themeColors={themeColors}>
                     <Input
                         label="Nama Toko"
                         value={storeName}
@@ -215,7 +215,7 @@ const SettingsScreen = ({ navigation }) => {
                 </SettingSection>
 
                 {/* Bluetooth Printer Section */}
-                <SettingSection title="Printer Bluetooth">
+                <SettingSection title="Printer Bluetooth" themeColors={themeColors}>
                     {isConnected ? (
                         <View style={styles.printerStatus}>
                             <View style={styles.printerInfo}>
@@ -281,8 +281,35 @@ const SettingsScreen = ({ navigation }) => {
                     )}
                 </SettingSection>
 
+                {/* Dark Mode Toggle Section */}
+                <SettingSection title="Mode Tampilan" themeColors={themeColors}>
+                    <View style={styles.darkModeRow}>
+                        <View style={styles.darkModeInfo}>
+                            <Ionicons
+                                name={isDark ? "moon" : "sunny"}
+                                size={24}
+                                color={primaryColor}
+                            />
+                            <View style={styles.darkModeTextContainer}>
+                                <Text style={[styles.darkModeTitle, { color: themeColors.text }]}>
+                                    Mode Gelap
+                                </Text>
+                                <Text style={[styles.darkModeSubtitle, { color: themeColors.textSecondary }]}>
+                                    {isDark ? 'Aktif' : 'Nonaktif'}
+                                </Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={isDark}
+                            onValueChange={toggleDarkMode}
+                            trackColor={{ false: '#767577', true: primaryColor + '60' }}
+                            thumbColor={isDark ? primaryColor : '#f4f3f4'}
+                        />
+                    </View>
+                </SettingSection>
+
                 {/* Theme Section */}
-                <SettingSection title="Pilihan Tema">
+                <SettingSection title="Pilihan Warna" themeColors={themeColors}>
                     <View style={styles.themeGrid}>
                         {THEME_OPTIONS.map((themeOption) => (
                             <TouchableOpacity
@@ -300,7 +327,8 @@ const SettingsScreen = ({ navigation }) => {
                                 </View>
                                 <Text style={[
                                     styles.themeName,
-                                    themeId === themeOption.id && styles.themeNameSelected
+                                    { color: themeColors.textSecondary },
+                                    themeId === themeOption.id && { color: themeColors.text, fontWeight: '600' }
                                 ]}>
                                     {themeOption.name}
                                 </Text>
@@ -310,7 +338,7 @@ const SettingsScreen = ({ navigation }) => {
                 </SettingSection>
 
                 {/* Receipt Preview Section */}
-                <SettingSection title="Header Nota">
+                <SettingSection title="Header Nota" themeColors={themeColors}>
                     <TouchableOpacity
                         style={styles.previewToggle}
                         onPress={() => setShowPreview(!showPreview)}
@@ -350,7 +378,7 @@ const SettingsScreen = ({ navigation }) => {
                 </View>
 
                 {/* Account Section */}
-                <SettingSection title="Akun">
+                <SettingSection title="Akun" themeColors={themeColors}>
                     <View style={styles.accountCard}>
                         <View style={[styles.accountAvatar, { backgroundColor: primaryColor }]}>
                             <Text style={styles.accountAvatarText}>
@@ -595,6 +623,28 @@ const styles = StyleSheet.create({
     version: {
         fontSize: 12,
         color: theme.colors.textSecondary,
+    },
+    // Dark Mode Toggle Styles
+    darkModeRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: theme.spacing.sm,
+    },
+    darkModeInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    darkModeTextContainer: {
+        marginLeft: theme.spacing.md,
+    },
+    darkModeTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    darkModeSubtitle: {
+        fontSize: 12,
+        marginTop: 2,
     },
 });
 

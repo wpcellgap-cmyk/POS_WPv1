@@ -18,7 +18,7 @@ import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 
 const CashierScreen = ({ navigation }) => {
     const { ownerId } = useAuth();
-    const { primaryColor } = useTheme();
+    const { primaryColor, themeColors } = useTheme();
     const [products, setProducts] = useState([]);
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -127,9 +127,9 @@ const CashierScreen = ({ navigation }) => {
                 onPress={() => addToCart(item)}
             >
                 <View style={styles.productInfo}>
-                    <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+                    <Text style={[styles.productName, { color: themeColors.text }]} numberOfLines={2}>{item.name}</Text>
                     <Text style={[styles.productPrice, { color: primaryColor }]}>{formatCurrency(item.sellPrice)}</Text>
-                    <Text style={styles.productStock}>Stok: {item.stock}</Text>
+                    <Text style={[styles.productStock, { color: themeColors.textSecondary }]}>Stok: {item.stock}</Text>
                 </View>
                 {inCart && (
                     <View style={styles.qtyBadge}>
@@ -165,9 +165,9 @@ const CashierScreen = ({ navigation }) => {
     );
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]} edges={['top', 'left', 'right']}>
             <View style={styles.header}>
-                <Text style={styles.title}>Kasir</Text>
+                <Text style={[styles.title, { color: themeColors.text }]}>Kasir</Text>
                 {cart.length > 0 && (
                     <TouchableOpacity onPress={clearCart}>
                         <Text style={styles.clearText}>Hapus Semua</Text>
@@ -175,14 +175,14 @@ const CashierScreen = ({ navigation }) => {
                 )}
             </View>
 
-            <View style={styles.searchContainer}>
-                <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+            <View style={[styles.searchContainer, { backgroundColor: themeColors.card }]}>
+                <Ionicons name="search" size={20} color={themeColors.textSecondary} />
                 <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, { color: themeColors.text }]}
                     placeholder="Cari produk..."
                     value={searchQuery}
                     onChangeText={setSearchQuery}
-                    placeholderTextColor={theme.colors.textSecondary}
+                    placeholderTextColor={themeColors.textSecondary}
                 />
             </View>
 
@@ -204,10 +204,10 @@ const CashierScreen = ({ navigation }) => {
                     />
                 </View>
 
-                <View style={styles.cartSection}>
-                    <View style={styles.cartHeader}>
-                        <Text style={styles.cartTitle}>Keranjang</Text>
-                        <Text style={styles.cartCount}>{getTotalItems()} item</Text>
+                <View style={[styles.cartSection, { backgroundColor: themeColors.card }]}>
+                    <View style={[styles.cartHeader, { borderBottomColor: themeColors.border }]}>
+                        <Text style={[styles.cartTitle, { color: themeColors.text }]}>Keranjang</Text>
+                        <Text style={[styles.cartCount, { color: themeColors.textSecondary }]}>{getTotalItems()} item</Text>
                     </View>
 
                     {cart.length === 0 ? (

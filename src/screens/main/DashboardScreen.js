@@ -22,7 +22,7 @@ const StatCard = ({ icon, label, value, color }) => (
 
 const DashboardScreen = ({ navigation }) => {
     const { userProfile, ownerId } = useAuth();
-    const { primaryColor } = useTheme();
+    const { primaryColor, themeColors } = useTheme();
     const [stats, setStats] = useState({
         totalProducts: 0,
         totalServices: 0,
@@ -294,7 +294,7 @@ const DashboardScreen = ({ navigation }) => {
         return 'Selamat Malam';
     };
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]} edges={['top', 'left', 'right']}>
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -341,44 +341,44 @@ const DashboardScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Menu Cepat</Text>
+                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Menu Cepat</Text>
                     <View style={styles.quickActions}>
                         <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('Service')}>
                             <View style={[styles.quickIcon, { backgroundColor: primaryColor + '20' }]}>
                                 <Ionicons name="add-circle" size={28} color={primaryColor} />
                             </View>
-                            <Text style={styles.quickLabel}>Tambah Service</Text>
+                            <Text style={[styles.quickLabel, { color: themeColors.text }]}>Tambah Service</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('Cashier')}>
                             <View style={[styles.quickIcon, { backgroundColor: theme.colors.success + '20' }]}>
                                 <Ionicons name="cart" size={28} color={theme.colors.success} />
                             </View>
-                            <Text style={styles.quickLabel}>Kasir</Text>
+                            <Text style={[styles.quickLabel, { color: themeColors.text }]}>Kasir</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('Stock')}>
                             <View style={[styles.quickIcon, { backgroundColor: theme.colors.warning + '20' }]}>
                                 <Ionicons name="cube" size={28} color={theme.colors.warning} />
                             </View>
-                            <Text style={styles.quickLabel}>Stok</Text>
+                            <Text style={[styles.quickLabel, { color: themeColors.text }]}>Stok</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 {recentTransactions.length > 0 && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Transaksi Terakhir</Text>
+                        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Transaksi Terakhir</Text>
                         {recentTransactions.slice(0, 3).map((tx) => (
-                            <TouchableOpacity key={tx.id} style={styles.transactionItem} onPress={() => openDetail(tx)}>
+                            <TouchableOpacity key={tx.id} style={[styles.transactionItem, { backgroundColor: themeColors.card }]} onPress={() => openDetail(tx)}>
                                 <View style={styles.txIcon}>
                                     <Ionicons name="receipt-outline" size={20} color={primaryColor} />
                                 </View>
                                 <View style={styles.txInfo}>
-                                    <Text style={styles.txCount}>{tx.itemCount || tx.items?.length || 0} item</Text>
-                                    <Text style={styles.txDate}>
+                                    <Text style={[styles.txCount, { color: themeColors.text }]}>{tx.itemCount || tx.items?.length || 0} item</Text>
+                                    <Text style={[styles.txDate, { color: themeColors.textSecondary }]}>
                                         {formatDate(tx.createdAt)}
                                     </Text>
                                 </View>
-                                <Text style={styles.txAmount}>{formatCurrency(tx.total)}</Text>
+                                <Text style={[styles.txAmount, { color: themeColors.text }]}>{formatCurrency(tx.total)}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -392,21 +392,21 @@ const DashboardScreen = ({ navigation }) => {
                 onRequestClose={() => setModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: themeColors.card }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Detail Transaksi</Text>
+                            <Text style={[styles.modalTitle, { color: themeColors.text }]}>Detail Transaksi</Text>
                             <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <Ionicons name="close" size={24} color={theme.colors.text} />
+                                <Ionicons name="close" size={24} color={themeColors.text} />
                             </TouchableOpacity>
                         </View>
 
                         {selectedTransaction && (
                             <View style={styles.modalBody}>
-                                <Text style={styles.modalDate}>
+                                <Text style={[styles.modalDate, { color: themeColors.textSecondary }]}>
                                     {formatDate(selectedTransaction.createdAt)}
                                 </Text>
 
-                                <View style={styles.itemsList}>
+                                <View style={[styles.itemsList, { backgroundColor: themeColors.background }]}>
                                     {selectedTransaction.items?.map((item, index) => (
                                         <View key={index} style={styles.detailItem}>
                                             <View style={styles.detailItemLeft}>

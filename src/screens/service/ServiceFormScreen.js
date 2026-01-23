@@ -37,7 +37,7 @@ const STATUS_OPTIONS = [
 
 const ServiceFormScreen = ({ navigation, route }) => {
     const { ownerId } = useAuth();
-    const { primaryColor } = useTheme();
+    const { primaryColor, themeColors } = useTheme();
     const existingService = route.params?.service;
     const isEditing = !!existingService;
 
@@ -47,6 +47,7 @@ const ServiceFormScreen = ({ navigation, route }) => {
     const [phoneType, setPhoneType] = useState(existingService?.phoneType || '');
     const [imei, setImei] = useState(existingService?.imei || '');
     const [damageDescription, setDamageDescription] = useState(existingService?.damageDescription || '');
+    const [partCost, setPartCost] = useState(existingService?.partCost?.toString() || '');
     const [cost, setCost] = useState(existingService?.cost?.toString() || '');
     const [warranty, setWarranty] = useState(existingService?.warranty || 'Tanpa Garansi');
     const [status, setStatus] = useState(existingService?.status || 'processing');
@@ -114,6 +115,7 @@ const ServiceFormScreen = ({ navigation, route }) => {
                 phoneType: phoneType.trim(),
                 imei: imei.trim(),
                 damageDescription: damageDescription.trim(),
+                partCost: parseFloat(partCost) || 0,
                 cost: parseFloat(cost) || 0,
                 warranty,
                 status,
@@ -198,7 +200,7 @@ const ServiceFormScreen = ({ navigation, route }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
@@ -214,7 +216,7 @@ const ServiceFormScreen = ({ navigation, route }) => {
                 </View>
 
                 <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
-                    <Text style={styles.sectionTitle}>Data Customer</Text>
+                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Data Customer</Text>
 
                     <Input
                         label="Nama Customer *"
@@ -234,7 +236,7 @@ const ServiceFormScreen = ({ navigation, route }) => {
                         icon="call-outline"
                     />
 
-                    <Text style={styles.sectionTitle}>Data Perangkat</Text>
+                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Data Perangkat</Text>
 
                     <View style={styles.row}>
                         <View style={styles.halfInput}>
@@ -271,12 +273,22 @@ const ServiceFormScreen = ({ navigation, route }) => {
                         label="Kerusakan *"
                         value={damageDescription}
                         onChangeText={setDamageDescription}
-                        placeholder="Deskripsi kerusakan"
+                        placeholder="Deskripsi kerusakan (tekan Enter untuk baris baru)"
                         error={errors.damageDescription}
                         icon="construct-outline"
+                        multiline={true}
                     />
 
-                    <Text style={styles.sectionTitle}>Biaya & Garansi</Text>
+                    <Input
+                        label="Harga Modal Part (Opsional)"
+                        value={partCost}
+                        onChangeText={setPartCost}
+                        placeholder="0"
+                        keyboardType="numeric"
+                        icon="pricetag-outline"
+                    />
+
+                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Biaya & Garansi</Text>
 
                     <Input
                         label="Biaya Service"
@@ -288,9 +300,9 @@ const ServiceFormScreen = ({ navigation, route }) => {
                         icon="cash-outline"
                     />
 
-                    <Text style={styles.inputLabel}>Status Service</Text>
+                    <Text style={[styles.inputLabel, { color: themeColors.text }]}>Status Service</Text>
                     <TouchableOpacity
-                        style={styles.pickerButton}
+                        style={[styles.pickerButton, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
                         onPress={() => {
                             setShowStatusPicker(!showStatusPicker);
                             setShowWarrantyPicker(false);
@@ -433,11 +445,11 @@ const styles = StyleSheet.create({
         paddingTop: 0,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
         color: theme.colors.text,
-        marginTop: theme.spacing.md,
-        marginBottom: theme.spacing.sm,
+        marginTop: 12,
+        marginBottom: 6,
     },
     row: {
         flexDirection: 'row',
@@ -451,8 +463,8 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
         color: theme.colors.text,
-        marginBottom: theme.spacing.xs,
-        marginTop: theme.spacing.sm,
+        marginBottom: 4,
+        marginTop: 6,
     },
     pickerButton: {
         flexDirection: 'row',
@@ -462,8 +474,8 @@ const styles = StyleSheet.create({
         borderRadius: theme.borderRadius.md,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        padding: theme.spacing.md,
-        height: 48,
+        padding: theme.spacing.sm,
+        height: 44,
     },
     pickerText: {
         fontSize: 16,
@@ -498,8 +510,8 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     buttonContainer: {
-        marginTop: theme.spacing.xl,
-        marginBottom: theme.spacing.xl,
+        marginTop: theme.spacing.lg,
+        marginBottom: theme.spacing.lg,
     },
     deleteButton: {
         flexDirection: 'row',
