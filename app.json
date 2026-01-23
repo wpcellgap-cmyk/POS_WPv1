@@ -12,7 +12,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "newArchEnabled": true
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +21,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.gavin2.poskonterapp",
-      "newArchEnabled": false,
+      "newArchEnabled": true,
       "permissions": [
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
@@ -43,8 +44,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "b3882398-ea04-4eed-8c4f-3133c2f0d2c2"
+        "projectId": "bfb3c939-eb59-4f86-951b-7af956e3a7f5"
       }
-    }
+    },
+    "owner": "gavin2"
   }
 }
