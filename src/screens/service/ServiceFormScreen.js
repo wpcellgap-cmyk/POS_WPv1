@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { theme } from '../../constants/theme';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
@@ -56,6 +57,23 @@ const ServiceFormScreen = ({ navigation, route }) => {
     const [showStatusPicker, setShowStatusPicker] = useState(false);
     const [errors, setErrors] = useState({});
     const [storeSettings, setStoreSettings] = useState({});
+
+    // Date picker state
+    const [serviceDate, setServiceDate] = useState(
+        existingService?.date?.toDate ? existingService.date.toDate() :
+            existingService?.createdAt?.toDate ? existingService.createdAt.toDate() :
+                new Date()
+    );
+    const [showDatePicker, setShowDatePicker] = useState(false);
+
+    // Format date to DD/MM/YYYY
+    const formatDate = (date) => {
+        const d = new Date(date);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+    };
 
     useEffect(() => {
         loadStoreSettings();
@@ -137,7 +155,7 @@ const ServiceFormScreen = ({ navigation, route }) => {
                     serviceData: {
                         ...serviceData,
                         id: docRef.id,
-                        date: new Date(),
+                        date: serviceDate,
                     },
                     storeSettings,
                 });
@@ -189,7 +207,7 @@ const ServiceFormScreen = ({ navigation, route }) => {
             damageDescription: damageDescription.trim(),
             cost: parseFloat(cost) || 0,
             warranty,
-            date: new Date(),
+            date: serviceDate,
         };
 
         navigation.navigate('ReceiptPreview', {
@@ -235,6 +253,32 @@ const ServiceFormScreen = ({ navigation, route }) => {
                         keyboardType="phone-pad"
                         icon="call-outline"
                     />
+
+                    <Text style={[styles.inputLabel, { color: themeColors.text }]}>Tanggal Servis</Text>
+                    <TouchableOpacity
+                        style={[styles.pickerButton, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+                        onPress={() => setShowDatePicker(true)}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="calendar-outline" size={20} color={primaryColor} style={{ marginRight: 10 }} />
+                            <Text style={[styles.pickerText, { color: themeColors.text }]}>
+                                {formatDate(serviceDate)}
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    {showDatePicker && (
+                        <DateTimePicker
+                            value={serviceDate}
+                            mode="date"
+                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                            onChange={(event, selectedDate) => {
+                                setShowDatePicker(Platform.OS === 'ios');
+                                if (selectedDate) setServiceDate(selectedDate);
+                            }}
+                        />
+                    )}
 
                     <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Data Perangkat</Text>
 

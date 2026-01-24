@@ -9,7 +9,7 @@ import { db } from '../../config/firebase';
 import { useBluetooth } from '../../context/BluetoothContext';
 import BluetoothService from '../../services/BluetoothService';
 import EscPosEncoder from 'esc-pos-encoder';
-import { collection, query, getDocs, orderBy, limit, getDoc, doc as fsDoc } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, getDoc, doc as fsDoc, deleteDoc } from 'firebase/firestore';
 import { Modal, Alert, ActivityIndicator } from 'react-native';
 
 const StatCard = ({ icon, label, value, color }) => (
@@ -226,7 +226,7 @@ const DashboardScreen = ({ navigation }) => {
             console.log('Stored Device:', storedDevice);
 
             if (!storedDevice) {
-                Alert.alert('Printer Tidak Terhubung', 'Silakan hubungkan printer di menu Pengaturan.');
+                Alert.alert('Printer Tidak Tersedia', 'Belum ada printer yang terhubung. Silakan hubungkan printer di menu Pengaturan.');
                 return;
             }
 
@@ -235,144 +235,30 @@ const DashboardScreen = ({ navigation }) => {
             console.log('Is Actually Connected:', isActuallyConnected);
 
             if (!isActuallyConnected) {
-                // Device stored but not connected
-                setPrinting(false);
-
-                Alert.alert(
-                    'Printer Tidak Terhubung',
-                    `Printer ${storedDevice.name} tidak terhubung. Pastikan printer dalam keadaan ON dan Bluetooth aktif.`,
-                    [
-                        { text: 'Batal', style: 'cancel' },
-                        {
-                            text: 'Hubungkan',
-                            onPress: async () => {
-                                setPrinting(true);
-                                try {
-                                    console.log('Attempting to reconnect...');
-                                    await BluetoothService.connectToDevice(storedDevice.address || storedDevice.id);
-                                    console.log('Reconnected successfully');
-
-                                    // Prepare and send print data
-                                    const encoder = new EscPosEncoder();
-                                    let result = encoder
-                                        .initialize()
-                                        .align('center')
-                                        .bold(true)
-                                        .line(settings.storeName)
-                                        .bold(false)
-                                        .line(settings.storeTagline)
-                                        .line(`WA: ${settings.storePhone}`)
-                                        .line('-'.repeat(32))
-                                        .align('left');
-
-                                    const date = transactionData.createdAt?.toDate ? transactionData.createdAt.toDate() : new Date(transactionData.createdAt);
-                                    result
-                                        .line(`Tgl: ${date.toLocaleDateString('id-ID')}`)
-                                        .line(`Jam: ${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
-                                        .line('-'.repeat(32));
-
-                                    transactionData.items?.forEach(item => {
-                                        result.line(item.name)
-                                        const qtyPrice = `${item.qty} x ${item.price.toLocaleString('id-ID')}`;
-                                        const subtotal = (item.subtotal || (item.price * item.qty)).toLocaleString('id-ID');
-                                        const spaces = 32 - qtyPrice.length - subtotal.length;
-                                        result.line(qtyPrice + ' '.repeat(Math.max(1, spaces)) + subtotal);
-                                    });
-
-                                    const pm = getPaymentMethodLabel(transactionData.paymentMethod);
-
-                                    result
-                                        .line('-'.repeat(32))
-                                        .bold(true)
-                                        .text('TOTAL')
-                                        .text(' '.repeat(32 - 5 - transactionData.total.toLocaleString('id-ID').length - 3))
-                                        .line(`Rp ${transactionData.total.toLocaleString('id-ID')}`)
-                                        .bold(false)
-                                        .line(`Bayar (${pm}): ${(transactionData.amountPaid || 0).toLocaleString('id-ID')}`)
-                                        .line(`Kembalian: ${(transactionData.change || 0).toLocaleString('id-ID')}`)
-                                        .line('-'.repeat(32))
-                                        .align('center')
-                                        .line('Terima Kasih')
-                                        .line(`Sudah Belanja di ${settings.storeName}`)
-                                        .newline()
-                                        .newline()
-                                        .newline()
-                                        .cut()
-                                        .encode();
-
-                                    await BluetoothService.sendData(result);
-                                    console.log('Print successful');
-                                    Alert.alert('Berhasil', 'Struk berhasil dicetak.');
-                                } catch (reconnectError) {
-                                    console.error('Reconnect/Print Error:', reconnectError);
-                                    Alert.alert('Koneksi Gagal', 'Tidak dapat terhubung ke printer. Pastikan printer menyala dan dalam jangkauan.');
-                                } finally {
-                                    setPrinting(false);
-                                }
-                            }
-                        }
-                    ]
-                );
-                return;
+                // Try to reconnect automatically
+                console.log('Attempting to reconnect...');
+                try {
+                    await BluetoothService.connectToDevice(storedDevice.address || storedDevice.id);
+                    console.log('Reconnected successfully');
+                } catch (reconnectError) {
+                    console.error('Reconnect failed:', reconnectError);
+                    Alert.alert(
+                        'Koneksi Gagal',
+                        `Tidak dapat terhubung ke printer ${storedDevice.name}. Pastikan printer dalam keadaan ON dan Bluetooth aktif.`
+                    );
+                    return;
+                }
             }
 
-            // Device is connected, proceed with print
-            console.log('Printing via Bluetooth...');
-
-            const encoder = new EscPosEncoder();
-            let result = encoder
-                .initialize()
-                .align('center')
-                .bold(true)
-                .line(settings.storeName)
-                .bold(false)
-                .line(settings.storeTagline)
-                .line(`WA: ${settings.storePhone}`)
-                .line('-'.repeat(32))
-                .align('left');
-
-            const date = transactionData.createdAt?.toDate ? transactionData.createdAt.toDate() : new Date(transactionData.createdAt);
-            result
-                .line(`Tgl: ${date.toLocaleDateString('id-ID')}`)
-                .line(`Jam: ${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
-                .line('-'.repeat(32));
-
-            transactionData.items?.forEach(item => {
-                result.line(item.name)
-                const qtyPrice = `${item.qty} x ${item.price.toLocaleString('id-ID')}`;
-                const subtotal = (item.subtotal || (item.price * item.qty)).toLocaleString('id-ID');
-                const spaces = 32 - qtyPrice.length - subtotal.length;
-                result.line(qtyPrice + ' '.repeat(Math.max(1, spaces)) + subtotal);
-            });
-
-            const pm = getPaymentMethodLabel(transactionData.paymentMethod);
-
-            result
-                .line('-'.repeat(32))
-                .bold(true)
-                .text('TOTAL')
-                .text(' '.repeat(32 - 5 - transactionData.total.toLocaleString('id-ID').length - 3))
-                .line(`Rp ${transactionData.total.toLocaleString('id-ID')}`)
-                .bold(false)
-                .line(`Bayar (${pm}): ${(transactionData.amountPaid || 0).toLocaleString('id-ID')}`)
-                .line(`Kembalian: ${(transactionData.change || 0).toLocaleString('id-ID')}`)
-                .line('-'.repeat(32))
-                .align('center')
-                .line('Terima Kasih')
-                .line(`Sudah Belanja di ${settings.storeName}`)
-                .newline()
-                .newline()
-                .newline()
-                .cut()
-                .encode();
-
-            await BluetoothService.sendData(result);
+            // Use the updated printSalesReceipt with raw ESC/POS commands
+            console.log('Printing via Bluetooth (raw ESC/POS)...');
+            await BluetoothService.printSalesReceipt(transactionData, settings);
             console.log('Print successful');
             Alert.alert('Berhasil', 'Struk berhasil dicetak.');
         } catch (error) {
             console.error('=== PRINT ERROR (Dashboard) ===');
             console.error('Print error:', error);
-            Alert.alert('Error', 'Gagal mencetak struk. Pastikan printer menyala.');
+            Alert.alert('Error', 'Gagal mencetak struk: ' + error.message);
         } finally {
             setPrinting(false);
         }
@@ -381,6 +267,32 @@ const DashboardScreen = ({ navigation }) => {
     const openDetail = (transaction) => {
         setSelectedTransaction(transaction);
         setModalVisible(true);
+    };
+
+    const handleDeleteTransaction = (transaction) => {
+        Alert.alert(
+            'Hapus Transaksi',
+            `Yakin ingin menghapus transaksi senilai ${formatCurrency(transaction.total)}?`,
+            [
+                { text: 'Batal', style: 'cancel' },
+                {
+                    text: 'Hapus',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteDoc(fsDoc(db, 'users', ownerId, 'transactions', transaction.id));
+                            setModalVisible(false);
+                            setSelectedTransaction(null);
+                            loadStats(); // Refresh data
+                            Alert.alert('Berhasil', 'Transaksi berhasil dihapus');
+                        } catch (error) {
+                            console.error('Delete error:', error);
+                            Alert.alert('Error', 'Gagal menghapus transaksi');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const getGreeting = () => {
@@ -522,39 +434,47 @@ const DashboardScreen = ({ navigation }) => {
                                 <View style={styles.divider} />
 
                                 <View style={styles.summaryRow}>
-                                    <Text style={styles.summaryLabel}>Total</Text>
-                                    <Text style={styles.summaryValue}>{formatCurrency(selectedTransaction.total)}</Text>
+                                    <Text style={[styles.summaryLabel, { color: themeColors.textSecondary }]}>Total</Text>
+                                    <Text style={[styles.summaryValue, { color: themeColors.text }]}>{formatCurrency(selectedTransaction.total)}</Text>
                                 </View>
                                 <View style={styles.summaryRow}>
-                                    <Text style={styles.summaryLabel}>Metode</Text>
-                                    <Text style={styles.summaryValue}>
+                                    <Text style={[styles.summaryLabel, { color: themeColors.textSecondary }]}>Metode</Text>
+                                    <Text style={[styles.summaryValue, { color: themeColors.text }]}>
                                         {getPaymentMethodLabel(selectedTransaction.paymentMethod)}
                                     </Text>
                                 </View>
                                 {selectedTransaction.paymentMethod === 'cash' && (
                                     <>
                                         <View style={styles.summaryRow}>
-                                            <Text style={styles.summaryLabel}>Dibayar</Text>
-                                            <Text style={styles.summaryValue}>
+                                            <Text style={[styles.summaryLabel, { color: themeColors.textSecondary }]}>Dibayar</Text>
+                                            <Text style={[styles.summaryValue, { color: themeColors.text }]}>
                                                 {formatCurrency(selectedTransaction.amountPaid)}
                                             </Text>
                                         </View>
                                         <View style={styles.summaryRow}>
-                                            <Text style={styles.summaryLabel}>Kembalian</Text>
-                                            <Text style={styles.summaryValue}>
+                                            <Text style={[styles.summaryLabel, { color: themeColors.textSecondary }]}>Kembalian</Text>
+                                            <Text style={[styles.summaryValue, { color: themeColors.text }]}>
                                                 {formatCurrency(selectedTransaction.change)}
                                             </Text>
                                         </View>
                                     </>
                                 )}
 
-                                <TouchableOpacity
-                                    style={[styles.printButton, { backgroundColor: primaryColor }]}
-                                    onPress={() => handlePrint(selectedTransaction)}
-                                >
-                                    <Ionicons name="print-outline" size={20} color={theme.colors.white} />
-                                    <Text style={styles.printButtonText}>Cetak Struk</Text>
-                                </TouchableOpacity>
+                                <View style={styles.modalActions}>
+                                    <TouchableOpacity
+                                        style={[styles.printButton, { backgroundColor: primaryColor, flex: 1, marginRight: 8 }]}
+                                        onPress={() => handlePrint(selectedTransaction)}
+                                    >
+                                        <Ionicons name="print-outline" size={20} color={theme.colors.white} />
+                                        <Text style={styles.printButtonText}>Cetak Struk</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.deleteButton]}
+                                        onPress={() => handleDeleteTransaction(selectedTransaction)}
+                                    >
+                                        <Ionicons name="trash-outline" size={20} color={theme.colors.white} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         )}
                     </View>
@@ -793,6 +713,19 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         marginLeft: theme.spacing.sm,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        marginTop: theme.spacing.xl,
+    },
+    deleteButton: {
+        backgroundColor: theme.colors.error,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        width: 50,
+        ...theme.shadow.sm,
     },
 });
 

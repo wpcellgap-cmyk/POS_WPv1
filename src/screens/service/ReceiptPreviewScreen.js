@@ -215,7 +215,7 @@ const ReceiptPreviewScreen = ({ navigation, route }) => {
         });
     };
 
-    const handlePrint = async () => {
+    const handleBluetoothPrint = async () => {
         setPrinting(true);
         try {
             console.log('=== BLUETOOTH PRINT START ===');
@@ -224,133 +224,75 @@ const ReceiptPreviewScreen = ({ navigation, route }) => {
             const storedDevice = await BluetoothService.getStoredDevice();
             console.log('Stored Device:', storedDevice);
 
-            if (storedDevice) {
-                setLoading(true);
+            if (!storedDevice) {
+                Alert.alert(
+                    'Printer Tidak Tersedia',
+                    'Belum ada printer yang terhubung. Silakan hubungkan printer di menu Pengaturan.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
 
-                // Check if device is actually connected
-                const isActuallyConnected = await BluetoothService.isReallyConnected();
-                console.log('Is Actually Connected:', isActuallyConnected);
+            setLoading(true);
 
-                if (!isActuallyConnected) {
-                    // Device stored but not connected
+            // Check if device is actually connected
+            const isActuallyConnected = await BluetoothService.isReallyConnected();
+            console.log('Is Actually Connected:', isActuallyConnected);
+
+            if (!isActuallyConnected) {
+                // Try to reconnect automatically
+                console.log('Attempting to reconnect...');
+                try {
+                    await BluetoothService.connectToDevice(storedDevice.address || storedDevice.id);
+                    console.log('Reconnected successfully');
+                } catch (reconnectError) {
+                    console.error('Reconnect failed:', reconnectError);
                     setLoading(false);
-                    setPrinting(false);
-
                     Alert.alert(
-                        'Printer Tidak Terhubung',
-                        `Printer ${storedDevice.name} tidak terhubung. Pastikan printer dalam keadaan ON dan Bluetooth aktif.`,
-                        [
-                            {
-                                text: 'Gunakan PDF',
-                                style: 'cancel',
-                                onPress: async () => {
-                                    setPrinting(true);
-                                    try {
-                                        await printToPdf();
-                                        Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
-                                    } catch (pdfError) {
-                                        console.error('PDF Print Error:', pdfError);
-                                        Alert.alert('Error', 'Gagal mencetak struk via PDF');
-                                    } finally {
-                                        setPrinting(false);
-                                    }
-                                }
-                            },
-                            {
-                                text: 'Hubungkan',
-                                onPress: async () => {
-                                    setPrinting(true);
-                                    setLoading(true);
-                                    try {
-                                        console.log('Attempting to reconnect...');
-                                        await BluetoothService.connectToDevice(storedDevice.address || storedDevice.id);
-                                        console.log('Reconnected successfully');
-
-                                        // Try to print after successful reconnection
-                                        await BluetoothService.printServiceReceipt(serviceData, storeSettings);
-                                        console.log('Print successful');
-                                        Alert.alert('Berhasil', 'Struk berhasil dicetak via Bluetooth');
-                                    } catch (reconnectError) {
-                                        console.error('Reconnect/Print Error:', reconnectError);
-                                        Alert.alert(
-                                            'Koneksi Gagal',
-                                            'Tidak dapat terhubung ke printer. Gunakan PDF?',
-                                            [
-                                                { text: 'Batal', style: 'cancel' },
-                                                {
-                                                    text: 'Gunakan PDF',
-                                                    onPress: async () => {
-                                                        try {
-                                                            await printToPdf();
-                                                            Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
-                                                        } catch (pdfError) {
-                                                            console.error('PDF Print Error:', pdfError);
-                                                            Alert.alert('Error', 'Gagal mencetak struk');
-                                                        }
-                                                    }
-                                                }
-                                            ]
-                                        );
-                                    } finally {
-                                        setLoading(false);
-                                        setPrinting(false);
-                                    }
-                                }
-                            }
-                        ]
+                        'Koneksi Gagal',
+                        `Tidak dapat terhubung ke printer ${storedDevice.name}. Pastikan printer dalam keadaan ON dan Bluetooth aktif.`,
+                        [{ text: 'OK' }]
                     );
                     return;
                 }
+            }
 
-                // Device is connected, proceed with Bluetooth print
-                try {
-                    console.log('Printing via Bluetooth...');
-                    await BluetoothService.printServiceReceipt(serviceData, storeSettings);
-                    console.log('Print successful');
-                    Alert.alert('Berhasil', 'Struk berhasil dicetak via Bluetooth');
-                } catch (printError) {
-                    console.error('Bluetooth Print Error:', printError);
-
-                    // Determine error message
-                    let errorMessage = 'Gagal mencetak ke Bluetooth.';
-                    if (printError.message.includes('timeout')) {
-                        errorMessage = 'Koneksi timeout. Pastikan printer dalam jangkauan.';
-                    } else if (printError.message.includes('not connected')) {
-                        errorMessage = 'Koneksi terputus saat mencetak.';
-                    }
-
-                    Alert.alert(
-                        'Print Error',
-                        errorMessage + ' Gunakan PDF sebagai cadangan?',
-                        [
-                            { text: 'Batal', style: 'cancel' },
-                            {
-                                text: 'Gunakan PDF',
-                                onPress: async () => {
-                                    try {
-                                        await printToPdf();
-                                        Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
-                                    } catch (pdfError) {
-                                        console.error('PDF Print Error:', pdfError);
-                                        Alert.alert('Error', 'Gagal mencetak struk via PDF');
-                                    }
-                                }
-                            }
-                        ]
-                    );
-                } finally {
-                    setLoading(false);
+            // Proceed with Bluetooth print
+            try {
+                console.log('Printing via Bluetooth...');
+                await BluetoothService.printServiceReceipt(serviceData, storeSettings);
+                console.log('Print successful');
+                Alert.alert('Berhasil', 'Struk berhasil dicetak via Bluetooth');
+            } catch (printError) {
+                console.error('Bluetooth Print Error:', printError);
+                let errorMessage = 'Gagal mencetak ke Bluetooth.';
+                if (printError.message.includes('timeout')) {
+                    errorMessage = 'Koneksi timeout. Pastikan printer dalam jangkauan.';
+                } else if (printError.message.includes('not connected')) {
+                    errorMessage = 'Koneksi terputus saat mencetak.';
                 }
-            } else {
-                // No stored device, use PDF directly
-                console.log('No stored device, using PDF');
-                await printToPdf();
-                Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
+                Alert.alert('Print Error', errorMessage);
+            } finally {
+                setLoading(false);
             }
         } catch (error) {
-            console.error('=== PRINT ERROR ===');
-            console.error('Error:', error);
-            Alert.alert('Error', 'Gagal memproses pencetakan');
+            console.error('Bluetooth Print Error:', error);
+            Alert.alert('Error', 'Gagal mencetak via Bluetooth: ' + error.message);
+        } finally {
+            setPrinting(false);
+        }
+    };
+
+    const handlePdfPrint = async () => {
+        setPrinting(true);
+        try {
+            console.log('=== PDF PRINT START ===');
+            await printToPdf();
+            console.log('PDF Print successful');
+            Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
+        } catch (error) {
+            console.error('PDF Print Error:', error);
+            Alert.alert('Error', 'Gagal mencetak struk via PDF');
         } finally {
             setPrinting(false);
         }
@@ -431,12 +373,21 @@ Terima kasih!
             <View style={styles.footer}>
                 <View style={styles.buttonRow}>
                     <TouchableOpacity
-                        style={[styles.secondaryButton, printing && styles.disabled]}
-                        onPress={handlePrint}
+                        style={[styles.bluetoothButton, printing && styles.disabled]}
+                        onPress={handleBluetoothPrint}
                         disabled={printing}
                     >
-                        <Ionicons name="print-outline" size={20} color={theme.colors.primary} />
-                        <Text style={styles.secondaryButtonText}>Cetak PDF</Text>
+                        <Ionicons name="bluetooth" size={20} color={theme.colors.white} />
+                        <Text style={styles.bluetoothButtonText}>Bluetooth</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.secondaryButton, printing && styles.disabled]}
+                        onPress={handlePdfPrint}
+                        disabled={printing}
+                    >
+                        <Ionicons name="document-text-outline" size={20} color={theme.colors.primary} />
+                        <Text style={styles.secondaryButtonText}>PDF</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -546,6 +497,21 @@ const styles = StyleSheet.create({
     },
     disabled: {
         opacity: 0.5,
+    },
+    bluetoothButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: '#2196F3',
+    },
+    bluetoothButtonText: {
+        color: theme.colors.white,
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: theme.spacing.xs,
     },
 });
 

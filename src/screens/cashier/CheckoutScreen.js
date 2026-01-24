@@ -163,7 +163,7 @@ const CheckoutScreen = ({ navigation, route }) => {
             console.log('Stored Device:', storedDevice);
 
             if (!storedDevice) {
-                Alert.alert('Printer Tidak Terhubung', 'Silakan hubungkan printer di menu Pengaturan.');
+                Alert.alert('Printer Tidak Tersedia', 'Belum ada printer yang terhubung. Silakan hubungkan printer di menu Pengaturan.');
                 return;
             }
 
@@ -172,140 +172,30 @@ const CheckoutScreen = ({ navigation, route }) => {
             console.log('Is Actually Connected:', isActuallyConnected);
 
             if (!isActuallyConnected) {
-                // Device stored but not connected
-                setPrinting(false);
-
-                Alert.alert(
-                    'Printer Tidak Terhubung',
-                    `Printer ${storedDevice.name} tidak terhubung. Pastikan printer dalam keadaan ON dan Bluetooth aktif.`,
-                    [
-                        { text: 'Batal', style: 'cancel' },
-                        {
-                            text: 'Hubungkan',
-                            onPress: async () => {
-                                setPrinting(true);
-                                try {
-                                    console.log('Attempting to reconnect...');
-                                    await BluetoothService.connectToDevice(storedDevice.address || storedDevice.id);
-                                    console.log('Reconnected successfully');
-
-                                    // Prepare and send print data
-                                    const encoder = new EscPosEncoder();
-                                    let result = encoder
-                                        .initialize()
-                                        .align('center')
-                                        .bold(true)
-                                        .line(settings.storeName)
-                                        .bold(false)
-                                        .line(settings.storeTagline)
-                                        .line(settings.storeAddress)
-                                        .line(`WA: ${settings.storePhone}`)
-                                        .line('-'.repeat(32))
-                                        .align('left')
-                                        .line(`Tgl: ${new Date().toLocaleDateString('id-ID')}`)
-                                        .line(`Jam: ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
-                                        .line('-'.repeat(32));
-
-                                    transactionData.items.forEach(item => {
-                                        result.line(item.name)
-                                        const qtyPrice = `${item.qty} x ${item.price.toLocaleString('id-ID')}`;
-                                        const subtotal = item.subtotal.toLocaleString('id-ID');
-                                        const spaces = 32 - qtyPrice.length - subtotal.length;
-                                        result.line(qtyPrice + ' '.repeat(Math.max(1, spaces)) + subtotal);
-                                    });
-
-                                    const pm = PAYMENT_METHODS.find(m => m.id === transactionData.paymentMethod)?.label || transactionData.paymentMethod;
-
-                                    result
-                                        .line('-'.repeat(32))
-                                        .bold(true)
-                                        .text('TOTAL')
-                                        .text(' '.repeat(32 - 5 - transactionData.total.toLocaleString('id-ID').length - 3))
-                                        .line(`Rp ${transactionData.total.toLocaleString('id-ID')}`)
-                                        .bold(false)
-                                        .line(`Bayar (${pm}): ${transactionData.amountPaid.toLocaleString('id-ID')}`)
-                                        .line(`Kembalian: ${transactionData.change.toLocaleString('id-ID')}`)
-                                        .line('-'.repeat(32))
-                                        .align('center')
-                                        .line('Terima Kasih')
-                                        .line(`Sudah Belanja di ${settings.storeName}`)
-                                        .newline()
-                                        .newline()
-                                        .newline()
-                                        .cut()
-                                        .encode();
-
-                                    await BluetoothService.sendData(result);
-                                    console.log('Print successful');
-                                    Alert.alert('Berhasil', 'Struk berhasil dicetak.');
-                                } catch (reconnectError) {
-                                    console.error('Reconnect/Print Error:', reconnectError);
-                                    Alert.alert('Koneksi Gagal', 'Tidak dapat terhubung ke printer. Pastikan printer menyala dan dalam jangkauan.');
-                                } finally {
-                                    setPrinting(false);
-                                }
-                            }
-                        }
-                    ]
-                );
-                return;
+                // Try to reconnect automatically
+                console.log('Attempting to reconnect...');
+                try {
+                    await BluetoothService.connectToDevice(storedDevice.address || storedDevice.id);
+                    console.log('Reconnected successfully');
+                } catch (reconnectError) {
+                    console.error('Reconnect failed:', reconnectError);
+                    Alert.alert(
+                        'Koneksi Gagal',
+                        `Tidak dapat terhubung ke printer ${storedDevice.name}. Pastikan printer dalam keadaan ON dan Bluetooth aktif.`
+                    );
+                    return;
+                }
             }
 
-            // Device is connected, proceed with print
-            console.log('Printing via Bluetooth...');
-
-            const encoder = new EscPosEncoder();
-            let result = encoder
-                .initialize()
-                .align('center')
-                .bold(true)
-                .line(settings.storeName)
-                .bold(false)
-                .line(settings.storeTagline)
-                .line(settings.storeAddress)
-                .line(`WA: ${settings.storePhone}`)
-                .line('-'.repeat(32))
-                .align('left')
-                .line(`Tgl: ${new Date().toLocaleDateString('id-ID')}`)
-                .line(`Jam: ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
-                .line('-'.repeat(32));
-
-            transactionData.items.forEach(item => {
-                result.line(item.name)
-                const qtyPrice = `${item.qty} x ${item.price.toLocaleString('id-ID')}`;
-                const subtotal = item.subtotal.toLocaleString('id-ID');
-                const spaces = 32 - qtyPrice.length - subtotal.length;
-                result.line(qtyPrice + ' '.repeat(Math.max(1, spaces)) + subtotal);
-            });
-
-            const pm = PAYMENT_METHODS.find(m => m.id === transactionData.paymentMethod)?.label || transactionData.paymentMethod;
-
-            result
-                .line('-'.repeat(32))
-                .bold(true)
-                .text('TOTAL')
-                .text(' '.repeat(32 - 5 - transactionData.total.toLocaleString('id-ID').length - 3))
-                .line(`Rp ${transactionData.total.toLocaleString('id-ID')}`)
-                .bold(false)
-                .line(`Bayar (${pm}): ${transactionData.amountPaid.toLocaleString('id-ID')}`)
-                .line(`Kembalian: ${transactionData.change.toLocaleString('id-ID')}`)
-                .line('-'.repeat(32))
-                .align('center')
-                .line('Terima Kasih')
-                .line(`Sudah Belanja di ${settings.storeName}`)
-                .newline()
-                .newline()
-                .newline()
-                .cut()
-                .encode();
-
-            await BluetoothService.sendData(result);
+            // Use the updated printSalesReceipt with raw ESC/POS commands
+            console.log('Printing via Bluetooth (raw ESC/POS)...');
+            await BluetoothService.printSalesReceipt(transactionData, settings);
             console.log('Print successful');
             Alert.alert('Berhasil', 'Struk berhasil dicetak.');
         } catch (error) {
             console.error('=== PRINT ERROR (Checkout) ===');
             console.error('Print Error:', error);
-            Alert.alert('Error', 'Gagal mencetak struk. Pastikan printer menyala.');
+            Alert.alert('Error', 'Gagal mencetak struk: ' + error.message);
         } finally {
             setPrinting(false);
         }
@@ -322,6 +212,15 @@ const CheckoutScreen = ({ navigation, route }) => {
 
         setLoading(true);
         try {
+            console.log('=== SAVING TRANSACTION ===');
+            console.log('ownerId:', ownerId);
+
+            if (!ownerId) {
+                console.error('ERROR: ownerId is null or undefined!');
+                Alert.alert('Error', 'User tidak terautentikasi. Silakan login ulang.');
+                return;
+            }
+
             const transactionData = {
                 items: cart.map(item => ({
                     productId: item.id,
@@ -338,9 +237,15 @@ const CheckoutScreen = ({ navigation, route }) => {
                 createdAt: new Date(),
             };
 
+            console.log('Transaction data:', JSON.stringify(transactionData, null, 2));
+
             // Save to Firestore (with serverTimestamp for real record)
             const dbData = { ...transactionData, createdAt: serverTimestamp() };
-            await addDoc(collection(db, 'users', ownerId, 'transactions'), dbData);
+            const transactionPath = `users/${ownerId}/transactions`;
+            console.log('Saving to path:', transactionPath);
+
+            const docRef = await addDoc(collection(db, 'users', ownerId, 'transactions'), dbData);
+            console.log('Transaction saved with ID:', docRef.id);
 
             // Update stock
             for (const item of cart) {
@@ -348,6 +253,7 @@ const CheckoutScreen = ({ navigation, route }) => {
                 await updateDoc(productRef, {
                     stock: increment(-item.qty)
                 });
+                console.log(`Stock updated for ${item.name}`);
             }
 
             Alert.alert(
@@ -370,8 +276,10 @@ const CheckoutScreen = ({ navigation, route }) => {
                 ]
             );
         } catch (error) {
-            console.error('Error saving transaction:', error);
-            Alert.alert('Error', 'Gagal menyimpan transaksi');
+            console.error('=== Error saving transaction ===');
+            console.error('Error details:', error);
+            console.error('Error message:', error.message);
+            Alert.alert('Error', 'Gagal menyimpan transaksi: ' + error.message);
         } finally {
             setLoading(false);
         }

@@ -86,14 +86,14 @@ const ProductListScreen = ({ navigation }) => {
 
     const renderProduct = ({ item }) => (
         <TouchableOpacity
-            style={[styles.productCard, { backgroundColor: themeColors.card }]}
+            style={styles.productCard}
             onPress={() => navigation.navigate('ProductForm', { product: item })}
             onLongPress={() => handleDeleteProduct(item.id, item.name)}
         >
             <View style={styles.productInfo}>
-                <Text style={[styles.productName, { color: themeColors.text }]} numberOfLines={2}>{item.name}</Text>
+                <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
                 <Text style={[styles.productPrice, { color: primaryColor }]}>{formatCurrency(item.sellPrice)}</Text>
-                <Text style={[styles.productStock, { color: themeColors.textSecondary }]}>Stok: {item.stock}</Text>
+                <Text style={styles.productStock}>Stok: {item.stock}</Text>
             </View>
             <View style={styles.stockBadge}>
                 <Text style={[
@@ -230,11 +230,11 @@ const styles = StyleSheet.create({
     productName: {
         fontSize: 16,
         fontWeight: '600',
-        color: theme.colors.text,
+        color: '#333333',  // Fixed dark color for visibility on white card
     },
     productCategory: {
         fontSize: 12,
-        color: theme.colors.textSecondary,
+        color: '#666666',
         marginTop: 2,
     },
     productPrice: {
@@ -242,6 +242,11 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: theme.colors.primary,
         marginTop: 4,
+    },
+    productStock: {
+        fontSize: 12,
+        color: '#666666',  // Fixed gray color
+        marginTop: 2,
     },
     stockBadge: {
         backgroundColor: theme.colors.background,

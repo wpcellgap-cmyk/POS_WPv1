@@ -15,7 +15,7 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useBluetooth } from '../../context/BluetoothContext';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
 import ReceiptTemplate from '../../components/ReceiptTemplate';
@@ -47,8 +47,17 @@ const SettingsScreen = ({ navigation }) => {
     const [showPreview, setShowPreview] = useState(false);
     const [isPairing, setIsPairing] = useState(false);
 
+    // Service stats for profit tracking
+    const [serviceStats, setServiceStats] = useState({
+        totalIncome: 0,
+        totalPartCost: 0,
+        profit: 0,
+        serviceCount: 0,
+    });
+
     useEffect(() => {
         loadSettings();
+        loadServiceStats();
     }, [ownerId]);
 
     const loadSettings = async () => {
@@ -69,6 +78,32 @@ const SettingsScreen = ({ navigation }) => {
             }
         } catch (error) {
             console.error('Error loading settings:', error);
+        }
+    };
+
+    const loadServiceStats = async () => {
+        if (!ownerId) return;
+        try {
+            const servicesRef = collection(db, 'users', ownerId, 'services');
+            const snapshot = await getDocs(servicesRef);
+
+            let totalIncome = 0;
+            let totalPartCost = 0;
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                totalIncome += parseFloat(data.cost) || 0;
+                totalPartCost += parseFloat(data.partCost) || 0;
+            });
+
+            setServiceStats({
+                totalIncome,
+                totalPartCost,
+                profit: totalIncome - totalPartCost,
+                serviceCount: snapshot.size,
+            });
+        } catch (error) {
+            console.error('Error loading service stats:', error);
         }
     };
 
@@ -212,6 +247,41 @@ const SettingsScreen = ({ navigation }) => {
                         keyboardType="phone-pad"
                         icon="logo-whatsapp"
                     />
+                </SettingSection>
+
+                {/* Service Profit Report Section */}
+                <SettingSection title="Laporan Service" themeColors={themeColors}>
+                    <View style={styles.statsRow}>
+                        <View style={styles.statsItem}>
+                            <Ionicons name="trending-up-outline" size={20} color={theme.colors.success} />
+                            <Text style={[styles.statsLabel, { color: themeColors.textSecondary }]}>Pendapatan Service</Text>
+                            <Text style={[styles.statsValue, { color: themeColors.text }]}>
+                                Rp {serviceStats.totalIncome.toLocaleString('id-ID')}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={styles.statsRow}>
+                        <View style={styles.statsItem}>
+                            <Ionicons name="cube-outline" size={20} color={theme.colors.warning} />
+                            <Text style={[styles.statsLabel, { color: themeColors.textSecondary }]}>Modal Part</Text>
+                            <Text style={[styles.statsValue, { color: themeColors.text }]}>
+                                Rp {serviceStats.totalPartCost.toLocaleString('id-ID')}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={[styles.statsDivider, { backgroundColor: themeColors.border }]} />
+                    <View style={styles.statsRow}>
+                        <View style={styles.statsItem}>
+                            <Ionicons name="wallet-outline" size={20} color={serviceStats.profit >= 0 ? primaryColor : theme.colors.error} />
+                            <Text style={[styles.statsLabel, { color: themeColors.textSecondary }]}>Laba (Profit)</Text>
+                            <Text style={[styles.statsValue, styles.profitValue, { color: serviceStats.profit >= 0 ? primaryColor : theme.colors.error }]}>
+                                Rp {serviceStats.profit.toLocaleString('id-ID')}
+                            </Text>
+                        </View>
+                    </View>
+                    <Text style={[styles.statsNote, { color: themeColors.textSecondary }]}>
+                        Dari {serviceStats.serviceCount} service
+                    </Text>
                 </SettingSection>
 
                 {/* Bluetooth Printer Section */}
@@ -645,6 +715,36 @@ const styles = StyleSheet.create({
     darkModeSubtitle: {
         fontSize: 12,
         marginTop: 2,
+    },
+    // Service Stats Styles
+    statsRow: {
+        paddingVertical: theme.spacing.sm,
+    },
+    statsItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    statsLabel: {
+        flex: 1,
+        fontSize: 14,
+        marginLeft: theme.spacing.sm,
+    },
+    statsValue: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    statsDivider: {
+        height: 1,
+        marginVertical: theme.spacing.sm,
+    },
+    profitValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    statsNote: {
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: theme.spacing.sm,
     },
 });
 

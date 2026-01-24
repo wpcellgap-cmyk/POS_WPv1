@@ -127,9 +127,9 @@ const CashierScreen = ({ navigation }) => {
                 onPress={() => addToCart(item)}
             >
                 <View style={styles.productInfo}>
-                    <Text style={[styles.productName, { color: themeColors.text }]} numberOfLines={2}>{item.name}</Text>
+                    <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
                     <Text style={[styles.productPrice, { color: primaryColor }]}>{formatCurrency(item.sellPrice)}</Text>
-                    <Text style={[styles.productStock, { color: themeColors.textSecondary }]}>Stok: {item.stock}</Text>
+                    <Text style={styles.productStock}>Stok: {item.stock}</Text>
                 </View>
                 {inCart && (
                     <View style={styles.qtyBadge}>
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     productName: {
         fontSize: 14,
         fontWeight: '600',
-        color: theme.colors.text,
+        color: '#333333',  // Fixed dark color for visibility on white card
         marginBottom: 4,
     },
     productPrice: {
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     },
     productStock: {
         fontSize: 11,
-        color: theme.colors.textSecondary,
+        color: '#666666',  // Fixed gray color for visibility on white card
         marginTop: 2,
     },
     qtyBadge: {

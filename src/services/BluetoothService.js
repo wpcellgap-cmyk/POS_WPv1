@@ -332,15 +332,16 @@ class BluetoothService {
         }
 
         // Step 2: Verify actual connection status (not just state)
+        const currentAddress = this.device?.address || this.device?.id;
         try {
-            const actuallyConnected = await RNBluetoothClassic.isDeviceConnected(deviceAddress);
+            const actuallyConnected = await RNBluetoothClassic.isDeviceConnected(currentAddress);
             if (!actuallyConnected) {
                 console.log('Device not actually connected, reconnecting...');
-                await this.connectToDevice(deviceAddress);
+                await this.connectToDevice(currentAddress);
             }
         } catch (connError) {
             console.log('Connection check failed, reconnecting...', connError.message);
-            await this.connectToDevice(deviceAddress);
+            await this.connectToDevice(currentAddress);
         }
 
         // Step 3: Send data with retry mechanism
@@ -350,24 +351,34 @@ class BluetoothService {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 console.log(`Send attempt ${attempt}/${maxRetries}...`);
+                console.log(`Data length: ${data.length} bytes`);
 
-                // Convert Uint8Array to Base64 string for sending
-                const base64Data = Buffer.from(data).toString('base64');
+                // FIX: Chunk RAW BYTES first, then encode each chunk to base64
+                // This prevents corruption from splitting base64 string incorrectly
+                const rawChunkSize = 256; // Smaller chunks for thermal printer stability
+                const totalChunks = Math.ceil(data.length / rawChunkSize);
 
-                // Send data in chunks for reliability (512 bytes per chunk)
-                const chunkSize = 512;
-                const totalChunks = Math.ceil(base64Data.length / chunkSize);
+                console.log(`Sending ${totalChunks} chunks of ${rawChunkSize} bytes each...`);
 
                 for (let i = 0; i < totalChunks; i++) {
-                    const chunk = base64Data.slice(i * chunkSize, (i + 1) * chunkSize);
+                    // Slice raw bytes
+                    const start = i * rawChunkSize;
+                    const end = Math.min(start + rawChunkSize, data.length);
+                    const chunk = data.slice(start, end);
+
+                    // Convert this chunk to base64
+                    const base64Chunk = Buffer.from(chunk).toString('base64');
+
+                    // Send to printer
                     await RNBluetoothClassic.writeToDevice(
-                        deviceAddress,
-                        chunk,
+                        currentAddress,
+                        base64Chunk,
                         'base64'
                     );
-                    // Small delay between chunks for printer buffer
+
+                    // Delay between chunks for printer buffer (increased for stability)
                     if (i < totalChunks - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await new Promise(resolve => setTimeout(resolve, 100));
                     }
                 }
 
@@ -382,7 +393,7 @@ class BluetoothService {
                     await new Promise(resolve => setTimeout(resolve, 500));
                     // Try to reconnect before retrying
                     try {
-                        await this.connectToDevice(deviceAddress);
+                        await this.connectToDevice(currentAddress);
                     } catch (reconnectError) {
                         console.error('Reconnect failed:', reconnectError.message);
                     }
@@ -430,87 +441,155 @@ class BluetoothService {
 
         const dateObj = date instanceof Date ? date : (date?.toDate ? date.toDate() : new Date(date));
 
-        // Helper function to wrap text for ESC/POS (32 char width)
-        const wrapText = (text, maxWidth = 32, indent = 0) => {
+        // ESC/POS Commands
+        const ESC = 0x1B;
+        const GS = 0x1D;
+        const LF = 0x0A;  // Line Feed
+
+        // Build raw command bytes
+        const commands = [];
+
+        // Initialize printer
+        commands.push(ESC, 0x40);  // ESC @ - Initialize
+
+        // Select character code table (CP437 or PC437 USA)
+        commands.push(ESC, 0x74, 0x00);  // ESC t 0 - Select CP437
+
+        // Helper function to add text with line feed
+        const addLine = (text) => {
+            const bytes = [];
+            for (let i = 0; i < text.length; i++) {
+                bytes.push(text.charCodeAt(i) & 0xFF);
+            }
+            bytes.push(LF);  // Line Feed
+            commands.push(...bytes);
+        };
+
+        // Helper function to center text
+        const addCentered = (text) => {
+            commands.push(ESC, 0x61, 0x01);  // ESC a 1 - Center align
+            addLine(text);
+        };
+
+        // Helper function to left align text
+        const addLeft = (text) => {
+            commands.push(ESC, 0x61, 0x00);  // ESC a 0 - Left align
+            addLine(text);
+        };
+
+        // Helper function to add bold text
+        const addBoldCentered = (text) => {
+            commands.push(ESC, 0x45, 0x01);  // ESC E 1 - Bold ON
+            addCentered(text);
+            commands.push(ESC, 0x45, 0x00);  // ESC E 0 - Bold OFF
+        };
+
+        const addBoldLeft = (text) => {
+            commands.push(ESC, 0x45, 0x01);  // ESC E 1 - Bold ON
+            addLeft(text);
+            commands.push(ESC, 0x45, 0x00);  // ESC E 0 - Bold OFF
+        };
+
+        // Helper for double-size text (header)
+        const addDoubleSize = (text) => {
+            commands.push(ESC, 0x61, 0x01);  // Center align
+            commands.push(GS, 0x21, 0x11);   // GS ! 17 - Double height + Double width
+            addLine(text);
+            commands.push(GS, 0x21, 0x00);   // GS ! 0 - Reset to normal size
+        };
+
+        // Helper for small font (Font B)
+        const addSmallCentered = (text) => {
+            commands.push(ESC, 0x61, 0x01);  // Center align
+            commands.push(ESC, 0x21, 0x01);  // ESC ! 1 - Select Font B (small)
+            addLine(text);
+            commands.push(ESC, 0x21, 0x00);  // ESC ! 0 - Reset to Font A (normal)
+        };
+
+        // Helper to wrap long text by word
+        const wrapText = (text, maxWidth = 32) => {
             if (!text) return ['-'];
             const lines = [];
-            const paragraphs = text.split('\n');
-            const indentStr = ' '.repeat(indent);
-            const effectiveWidth = maxWidth - indent;
+            const words = text.replace(/\n/g, ' ').split(' ').filter(w => w.length > 0);
+            let currentLine = '';
 
-            paragraphs.forEach(paragraph => {
-                const words = paragraph.split(' ');
-                let currentLine = '';
-
-                words.forEach(word => {
-                    if ((currentLine + ' ' + word).trim().length <= effectiveWidth) {
-                        currentLine = (currentLine + ' ' + word).trim();
-                    } else {
-                        if (currentLine) lines.push(indentStr + currentLine);
-                        currentLine = word;
-                    }
-                });
-                if (currentLine) lines.push(indentStr + currentLine);
+            words.forEach(word => {
+                if (currentLine.length === 0) {
+                    currentLine = word;
+                } else if ((currentLine + ' ' + word).length <= maxWidth) {
+                    currentLine = currentLine + ' ' + word;
+                } else {
+                    lines.push(currentLine);
+                    currentLine = word;
+                }
             });
-
+            if (currentLine) lines.push(currentLine);
             return lines.length > 0 ? lines : ['-'];
         };
 
-        const encoder = new EscPosEncoder();
-        let result = encoder
-            .initialize()
-            .align('center')
-            .bold(true)
-            .line(storeName)
-            .bold(false)
-            .line(storeTagline);
+        // ===== BUILD RECEIPT =====
 
-        if (storeAddress) result.line(storeAddress);
-        if (storePhone) result.line(`WA: ${storePhone}`);
+        // Header - Double size store name
+        addDoubleSize(storeName);
+        commands.push(LF);  // Extra spacing after store name
 
-        result
-            .line('*'.repeat(32))
-            .align('left')
-            .line(`${dateObj.toLocaleDateString('id-ID')}   ${dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
-            .line(`No Service : ${serviceNumber}`)
-            .line('*'.repeat(32))
-            .align('center')
-            .bold(true)
-            .line('* Customer *')
-            .bold(false)
-            .align('left')
-            .line(`Nama     : ${customerName}`)
-            .line(`Nomor HP : ${customerPhone || '-'}`)
-            .line('-'.repeat(32))
-            .line(`Merk HP  : ${phoneBrand}`)
-            .line(`Type HP  : ${phoneType || '-'}`)
-            .line(`Imei     : ${imei || '-'}`);
+        addCentered(storeTagline);
+        if (storeAddress) addCentered(storeAddress);
+        if (storePhone) addCentered(`WA: ${storePhone}`);
+        addCentered('********************************');
 
-        // Handle multiline kerusakan with wrapping
-        const kerusakanLines = wrapText(damageDescription, 32, 11); // 11 = length of "Kerusakan: "
-        result.line(`Kerusakan: ${kerusakanLines[0].trim()}`);
+        // Date and Service Number
+        addLeft(`${dateObj.toLocaleDateString('id-ID')}   ${dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`);
+        addLeft(`No Service : ${serviceNumber}`);
+        addCentered('********************************');
+
+        // Customer Section
+        addBoldCentered('* Customer *');
+        addLeft(`Nama     : ${customerName}`);
+        addLeft(`Nomor HP : ${customerPhone || '-'}`);
+        addLeft('--------------------------------');
+
+        // Device Info
+        addLeft(`Merk HP  : ${phoneBrand}`);
+        addLeft(`Type HP  : ${phoneType || '-'}`);
+        addLeft(`Imei     : ${imei || '-'}`);
+
+        // Kerusakan (with wrap)
+        const kerusakanLines = wrapText(damageDescription, 21);  // 32 - 11 (label length)
+        addLeft(`Kerusakan: ${kerusakanLines[0]}`);
         kerusakanLines.slice(1).forEach(line => {
-            result.line(line);
+            addLeft(`           ${line}`);
         });
 
-        result
-            .line('-'.repeat(32))
-            .bold(true)
-            .line(`Biaya    : Rp ${(cost || 0).toLocaleString('id-ID')}`)
-            .bold(false)
-            .line(`Garansi  : ${warranty}`)
-            .line('*'.repeat(32))
-            .align('center')
-            .line('Terima Kasih Atas Kepercayaan Anda')
-            .line('Kepuasan Konsumen Adalah')
-            .line('Prioritas Kami')
-            .newline()
-            .newline()
-            .newline()
-            .cut()
-            .encode();
+        addLeft('--------------------------------');
 
-        await this.sendData(result);
+        // Cost and Warranty
+        addBoldLeft(`Biaya    : Rp ${(cost || 0).toLocaleString('id-ID')}`);
+        addLeft(`Garansi  : ${warranty}`);
+        addCentered('********************************');
+
+        // Footer - Small font with word-wrap
+        const footerLine1 = 'Terima Kasih Atas Kepercayaan Anda';
+        const footerLine2 = 'Kepuasan Konsumen Adalah Prioritas Kami';
+
+        // For small font (Font B), width is ~42 chars on 58mm paper
+        const footerWrap1 = wrapText(footerLine1, 42);
+        const footerWrap2 = wrapText(footerLine2, 42);
+
+        footerWrap1.forEach(line => addSmallCentered(line));
+        footerWrap2.forEach(line => addSmallCentered(line));
+
+        // Feed paper (3 lines for easy tear)
+        commands.push(LF, LF, LF);
+
+        // Partial cut (if supported) - GS V 1
+        commands.push(GS, 0x56, 0x01);
+
+        // Convert to Uint8Array
+        const data = new Uint8Array(commands);
+
+        console.log(`Sending ${data.length} bytes to printer...`);
+        await this.sendData(data);
     }
 
     /**
@@ -535,56 +614,114 @@ class BluetoothService {
             return labels[method] || method;
         };
 
-        const encoder = new EscPosEncoder();
-        let result = encoder
-            .initialize()
-            .align('center')
-            .bold(true)
-            .line(storeName)
-            .bold(false)
-            .line(storeTagline);
+        // ESC/POS Commands
+        const ESC = 0x1B;
+        const GS = 0x1D;
+        const LF = 0x0A;
 
-        if (storeAddress) result.line(storeAddress);
-        if (storePhone) result.line(`WA: ${storePhone}`);
+        const commands = [];
 
-        result
-            .line('-'.repeat(32))
-            .align('left')
-            .line(`Tgl: ${date.toLocaleDateString('id-ID')}`)
-            .line(`Jam: ${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
-            .line('-'.repeat(32));
+        // Initialize printer
+        commands.push(ESC, 0x40);  // ESC @ - Initialize
+        commands.push(ESC, 0x74, 0x00);  // ESC t 0 - Select CP437
 
-        // Print items
+        // Helper functions
+        const addLine = (text) => {
+            for (let i = 0; i < text.length; i++) {
+                commands.push(text.charCodeAt(i) & 0xFF);
+            }
+            commands.push(LF);
+        };
+
+        const addCentered = (text) => {
+            commands.push(ESC, 0x61, 0x01);
+            addLine(text);
+        };
+
+        const addLeft = (text) => {
+            commands.push(ESC, 0x61, 0x00);
+            addLine(text);
+        };
+
+        const addBoldCentered = (text) => {
+            commands.push(ESC, 0x45, 0x01);
+            addCentered(text);
+            commands.push(ESC, 0x45, 0x00);
+        };
+
+        const addBoldLeft = (text) => {
+            commands.push(ESC, 0x45, 0x01);
+            addLeft(text);
+            commands.push(ESC, 0x45, 0x00);
+        };
+
+        // Helper for double-size text (header)
+        const addDoubleSize = (text) => {
+            commands.push(ESC, 0x61, 0x01);  // Center align
+            commands.push(GS, 0x21, 0x11);   // GS ! 17 - Double height + Double width
+            addLine(text);
+            commands.push(GS, 0x21, 0x00);   // GS ! 0 - Reset to normal size
+        };
+
+        // Helper for small font (Font B)
+        const addSmallCentered = (text) => {
+            commands.push(ESC, 0x61, 0x01);  // Center align
+            commands.push(ESC, 0x21, 0x01);  // ESC ! 1 - Select Font B (small)
+            addLine(text);
+            commands.push(ESC, 0x21, 0x00);  // ESC ! 0 - Reset to Font A (normal)
+        };
+
+        // ===== BUILD RECEIPT =====
+
+        // Header - Double size store name
+        addDoubleSize(storeName);
+        commands.push(LF);  // Extra spacing after store name
+
+        addCentered(storeTagline);
+        if (storeAddress) addCentered(storeAddress);
+        if (storePhone) addCentered(`WA: ${storePhone}`);
+        addLeft('--------------------------------');
+
+        // Date/Time
+        addLeft(`Tgl: ${date.toLocaleDateString('id-ID')}`);
+        addLeft(`Jam: ${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`);
+        addLeft('--------------------------------');
+
+        // Items
         transactionData.items?.forEach(item => {
-            result.line(item.name);
+            addLeft(item.name);
             const qtyPrice = `${item.qty} x ${item.price.toLocaleString('id-ID')}`;
             const subtotal = (item.subtotal || (item.price * item.qty)).toLocaleString('id-ID');
             const spaces = 32 - qtyPrice.length - subtotal.length;
-            result.line(qtyPrice + ' '.repeat(Math.max(1, spaces)) + subtotal);
+            addLeft(qtyPrice + ' '.repeat(Math.max(1, spaces)) + subtotal);
         });
 
         const pm = getPaymentLabel(transactionData.paymentMethod);
 
-        result
-            .line('-'.repeat(32))
-            .bold(true)
-            .text('TOTAL')
-            .text(' '.repeat(32 - 5 - transactionData.total.toLocaleString('id-ID').length - 3))
-            .line(`Rp ${transactionData.total.toLocaleString('id-ID')}`)
-            .bold(false)
-            .line(`Bayar (${pm}): ${(transactionData.amountPaid || 0).toLocaleString('id-ID')}`)
-            .line(`Kembalian: ${(transactionData.change || 0).toLocaleString('id-ID')}`)
-            .line('-'.repeat(32))
-            .align('center')
-            .line('Terima Kasih')
-            .line(`Sudah Belanja di ${storeName}`)
-            .newline()
-            .newline()
-            .newline()
-            .cut()
-            .encode();
+        addLeft('--------------------------------');
 
-        await this.sendData(result);
+        // Total
+        const totalStr = `Rp ${transactionData.total.toLocaleString('id-ID')}`;
+        const totalSpaces = 32 - 5 - totalStr.length;
+        addBoldLeft('TOTAL' + ' '.repeat(Math.max(1, totalSpaces)) + totalStr);
+
+        addLeft(`Bayar (${pm}): ${(transactionData.amountPaid || 0).toLocaleString('id-ID')}`);
+        addLeft(`Kembalian: ${(transactionData.change || 0).toLocaleString('id-ID')}`);
+        addLeft('--------------------------------');
+
+        // Footer - Small font
+        addSmallCentered('Terima Kasih');
+        addSmallCentered(`Sudah Belanja di ${storeName}`);
+
+        // Feed paper (3 lines for easy tear)
+        commands.push(LF, LF, LF);
+
+        // Partial cut
+        commands.push(GS, 0x56, 0x01);
+
+        const data = new Uint8Array(commands);
+        console.log(`Sending ${data.length} bytes to printer...`);
+        await this.sendData(data);
     }
 
     isSupported() {
