@@ -180,10 +180,12 @@ const HistoryScreen = () => {
     const handlePrint = async (transactionData) => {
         setPrinting(true);
         try {
+            console.log('=== BLUETOOTH PRINT START (History) ===');
+
             // Get store settings
             const storeSettingsDoc = await getDoc(fsDoc(db, 'users', ownerId, 'settings', 'store'));
             const currentStoreSettings = storeSettingsDoc.exists() ? storeSettingsDoc.data() : {
-                storeName: 'WP Cell', // Default if not found
+                storeName: 'WP Cell',
                 storeTagline: 'Service HP Software & Hardware',
                 storeAddress: '',
                 storePhone: '',
@@ -191,33 +193,90 @@ const HistoryScreen = () => {
 
             const printToPdf = async () => {
                 const html = generateHtml(transactionData, currentStoreSettings);
+                // 58mm thermal paper: width = 58mm = 164pt (1mm ≈ 2.83pt)
                 await Print.printAsync({
                     html,
-                    width: 58 * 2.83,
+                    width: 164,  // 58mm in points
+                    height: 842, // A4 height as max, content will auto-fit
+                    orientation: 'portrait',
+                    margins: {
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                    },
                 });
             };
 
-            // Check for Bluetooth Printer
-            const connectedPrinter = await BluetoothService.getStoredDevice();
-            if (connectedPrinter) {
-                try {
-                    await BluetoothService.printSalesReceipt(transactionData, currentStoreSettings);
-                    Alert.alert('Berhasil', 'Struk berhasil dicetak via Bluetooth');
-                    return;
-                } catch (error) {
-                    console.error('Bluetooth Print Error:', error);
+            // Check if there's a stored printer
+            const storedDevice = await BluetoothService.getStoredDevice();
+            console.log('Stored Device:', storedDevice);
+
+            if (storedDevice) {
+                // Check if device is actually connected
+                const isActuallyConnected = await BluetoothService.isReallyConnected();
+                console.log('Is Actually Connected:', isActuallyConnected);
+
+                if (!isActuallyConnected) {
+                    // Device stored but not connected
+                    setPrinting(false);
+
                     Alert.alert(
-                        'Print Error',
-                        'Gagal mencetak ke Bluetooth. Gunakan PDF sebagai cadangan?',
+                        'Printer Tidak Terhubung',
+                        `Printer ${storedDevice.name} tidak terhubung. Pastikan printer dalam keadaan ON dan Bluetooth aktif.`,
                         [
-                            { text: 'Batal', style: 'cancel' },
                             {
-                                text: 'Gunakan PDF', onPress: async () => {
+                                text: 'Gunakan PDF',
+                                style: 'cancel',
+                                onPress: async () => {
+                                    setPrinting(true);
                                     try {
                                         await printToPdf();
                                         Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
                                     } catch (pdfError) {
+                                        console.error('PDF Print Error:', pdfError);
                                         Alert.alert('Error', 'Gagal mencetak PDF');
+                                    } finally {
+                                        setPrinting(false);
+                                    }
+                                }
+                            },
+                            {
+                                text: 'Hubungkan',
+                                onPress: async () => {
+                                    setPrinting(true);
+                                    try {
+                                        console.log('Attempting to reconnect...');
+                                        await BluetoothService.connectToDevice(storedDevice.address || storedDevice.id);
+                                        console.log('Reconnected successfully');
+
+                                        // Try to print after successful reconnection
+                                        await BluetoothService.printSalesReceipt(transactionData, currentStoreSettings);
+                                        console.log('Print successful');
+                                        Alert.alert('Berhasil', 'Struk berhasil dicetak via Bluetooth');
+                                    } catch (reconnectError) {
+                                        console.error('Reconnect/Print Error:', reconnectError);
+                                        Alert.alert(
+                                            'Koneksi Gagal',
+                                            'Tidak dapat terhubung ke printer. Gunakan PDF?',
+                                            [
+                                                { text: 'Batal', style: 'cancel' },
+                                                {
+                                                    text: 'Gunakan PDF',
+                                                    onPress: async () => {
+                                                        try {
+                                                            await printToPdf();
+                                                            Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
+                                                        } catch (pdfError) {
+                                                            console.error('PDF Print Error:', pdfError);
+                                                            Alert.alert('Error', 'Gagal mencetak PDF');
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        );
+                                    } finally {
+                                        setPrinting(false);
                                     }
                                 }
                             }
@@ -225,12 +284,53 @@ const HistoryScreen = () => {
                     );
                     return;
                 }
-            }
 
-            await printToPdf();
-            Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
+                // Device is connected, proceed with Bluetooth print
+                try {
+                    console.log('Printing via Bluetooth...');
+                    await BluetoothService.printSalesReceipt(transactionData, currentStoreSettings);
+                    console.log('Print successful');
+                    Alert.alert('Berhasil', 'Struk berhasil dicetak via Bluetooth');
+                } catch (printError) {
+                    console.error('Bluetooth Print Error:', printError);
+
+                    // Determine error message
+                    let errorMessage = 'Gagal mencetak ke Bluetooth.';
+                    if (printError.message.includes('timeout')) {
+                        errorMessage = 'Koneksi timeout. Pastikan printer dalam jangkauan.';
+                    } else if (printError.message.includes('not connected')) {
+                        errorMessage = 'Koneksi terputus saat mencetak.';
+                    }
+
+                    Alert.alert(
+                        'Print Error',
+                        errorMessage + ' Gunakan PDF sebagai cadangan?',
+                        [
+                            { text: 'Batal', style: 'cancel' },
+                            {
+                                text: 'Gunakan PDF',
+                                onPress: async () => {
+                                    try {
+                                        await printToPdf();
+                                        Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
+                                    } catch (pdfError) {
+                                        console.error('PDF Print Error:', pdfError);
+                                        Alert.alert('Error', 'Gagal mencetak PDF');
+                                    }
+                                }
+                            }
+                        ]
+                    );
+                }
+            } else {
+                // No stored device, use PDF directly
+                console.log('No stored device, using PDF');
+                await printToPdf();
+                Alert.alert('Berhasil', 'Struk berhasil dicetak via PDF');
+            }
         } catch (error) {
-            console.error('Print error:', error);
+            console.error('=== PRINT ERROR (History) ===');
+            console.error('Error:', error);
             Alert.alert('Error', 'Gagal mencetak struk');
         } finally {
             setPrinting(false);

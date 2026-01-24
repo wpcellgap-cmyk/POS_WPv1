@@ -208,13 +208,10 @@ const DashboardScreen = ({ navigation }) => {
     const { isConnected } = useBluetooth();
 
     const handlePrint = async (transactionData) => {
-        if (!isConnected) {
-            Alert.alert('Printer Tidak Terhubung', 'Silakan hubungkan printer di menu Pengaturan.');
-            return;
-        }
-
         setPrinting(true);
         try {
+            console.log('=== BLUETOOTH PRINT START (Dashboard) ===');
+
             // Get store settings
             const storeSettingsDoc = await getDoc(fsDoc(db, 'users', ownerId, 'settings', 'store'));
             const settings = storeSettingsDoc.exists() ? storeSettingsDoc.data() : {
@@ -223,6 +220,104 @@ const DashboardScreen = ({ navigation }) => {
                 storeAddress: '',
                 storePhone: '',
             };
+
+            // Check if there's a stored printer
+            const storedDevice = await BluetoothService.getStoredDevice();
+            console.log('Stored Device:', storedDevice);
+
+            if (!storedDevice) {
+                Alert.alert('Printer Tidak Terhubung', 'Silakan hubungkan printer di menu Pengaturan.');
+                return;
+            }
+
+            // Check if device is actually connected
+            const isActuallyConnected = await BluetoothService.isReallyConnected();
+            console.log('Is Actually Connected:', isActuallyConnected);
+
+            if (!isActuallyConnected) {
+                // Device stored but not connected
+                setPrinting(false);
+
+                Alert.alert(
+                    'Printer Tidak Terhubung',
+                    `Printer ${storedDevice.name} tidak terhubung. Pastikan printer dalam keadaan ON dan Bluetooth aktif.`,
+                    [
+                        { text: 'Batal', style: 'cancel' },
+                        {
+                            text: 'Hubungkan',
+                            onPress: async () => {
+                                setPrinting(true);
+                                try {
+                                    console.log('Attempting to reconnect...');
+                                    await BluetoothService.connectToDevice(storedDevice.address || storedDevice.id);
+                                    console.log('Reconnected successfully');
+
+                                    // Prepare and send print data
+                                    const encoder = new EscPosEncoder();
+                                    let result = encoder
+                                        .initialize()
+                                        .align('center')
+                                        .bold(true)
+                                        .line(settings.storeName)
+                                        .bold(false)
+                                        .line(settings.storeTagline)
+                                        .line(`WA: ${settings.storePhone}`)
+                                        .line('-'.repeat(32))
+                                        .align('left');
+
+                                    const date = transactionData.createdAt?.toDate ? transactionData.createdAt.toDate() : new Date(transactionData.createdAt);
+                                    result
+                                        .line(`Tgl: ${date.toLocaleDateString('id-ID')}`)
+                                        .line(`Jam: ${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`)
+                                        .line('-'.repeat(32));
+
+                                    transactionData.items?.forEach(item => {
+                                        result.line(item.name)
+                                        const qtyPrice = `${item.qty} x ${item.price.toLocaleString('id-ID')}`;
+                                        const subtotal = (item.subtotal || (item.price * item.qty)).toLocaleString('id-ID');
+                                        const spaces = 32 - qtyPrice.length - subtotal.length;
+                                        result.line(qtyPrice + ' '.repeat(Math.max(1, spaces)) + subtotal);
+                                    });
+
+                                    const pm = getPaymentMethodLabel(transactionData.paymentMethod);
+
+                                    result
+                                        .line('-'.repeat(32))
+                                        .bold(true)
+                                        .text('TOTAL')
+                                        .text(' '.repeat(32 - 5 - transactionData.total.toLocaleString('id-ID').length - 3))
+                                        .line(`Rp ${transactionData.total.toLocaleString('id-ID')}`)
+                                        .bold(false)
+                                        .line(`Bayar (${pm}): ${(transactionData.amountPaid || 0).toLocaleString('id-ID')}`)
+                                        .line(`Kembalian: ${(transactionData.change || 0).toLocaleString('id-ID')}`)
+                                        .line('-'.repeat(32))
+                                        .align('center')
+                                        .line('Terima Kasih')
+                                        .line(`Sudah Belanja di ${settings.storeName}`)
+                                        .newline()
+                                        .newline()
+                                        .newline()
+                                        .cut()
+                                        .encode();
+
+                                    await BluetoothService.sendData(result);
+                                    console.log('Print successful');
+                                    Alert.alert('Berhasil', 'Struk berhasil dicetak.');
+                                } catch (reconnectError) {
+                                    console.error('Reconnect/Print Error:', reconnectError);
+                                    Alert.alert('Koneksi Gagal', 'Tidak dapat terhubung ke printer. Pastikan printer menyala dan dalam jangkauan.');
+                                } finally {
+                                    setPrinting(false);
+                                }
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
+
+            // Device is connected, proceed with print
+            console.log('Printing via Bluetooth...');
 
             const encoder = new EscPosEncoder();
             let result = encoder
@@ -272,8 +367,10 @@ const DashboardScreen = ({ navigation }) => {
                 .encode();
 
             await BluetoothService.sendData(result);
+            console.log('Print successful');
             Alert.alert('Berhasil', 'Struk berhasil dicetak.');
         } catch (error) {
+            console.error('=== PRINT ERROR (Dashboard) ===');
             console.error('Print error:', error);
             Alert.alert('Error', 'Gagal mencetak struk. Pastikan printer menyala.');
         } finally {

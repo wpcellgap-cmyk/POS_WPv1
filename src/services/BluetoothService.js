@@ -281,6 +281,21 @@ class BluetoothService {
     }
 
     /**
+     * Check if device is actually connected (real-time check)
+     * @returns {Promise<boolean>}
+     */
+    async isReallyConnected() {
+        if (!this.device) return false;
+        try {
+            const deviceAddress = this.device.address || this.device.id;
+            return await RNBluetoothClassic.isDeviceConnected(deviceAddress);
+        } catch (error) {
+            console.error('Connection check error:', error);
+            return false;
+        }
+    }
+
+    /**
      * Get current device
      * @returns {Object|null}
      */
